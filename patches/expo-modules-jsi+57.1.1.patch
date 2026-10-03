@@ -1,0 +1,166 @@
+diff --git a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI-Cxx/include/RuntimeScheduler.h b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI-Cxx/include/RuntimeScheduler.h
+index 6115e87..2640cd4
+--- a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI-Cxx/include/RuntimeScheduler.h
++++ b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI-Cxx/include/RuntimeScheduler.h
+@@ -50,7 +50,11 @@ public:
+    `scheduleTask` dispatches through `fn`, which the host implements against
+    the real react::RuntimeScheduler.
+    */
+-  SWIFT_RETURNS_RETAINED RuntimeScheduler(void *scheduler, ScheduleFn fn) noexcept
++  // Patched for Xcode 26.3 / Swift 6.2.4: SWIFT_RETURNS_RETAINED is no longer
++  // accepted on a constructor. Swift's C++ interop already treats a
++  // SWIFT_SHARED_REFERENCE constructor's result as +1, so dropping the
++  // annotation keeps the ownership semantics identical.
++  RuntimeScheduler(void *scheduler, ScheduleFn fn) noexcept
+       : nativeScheduler(scheduler), scheduleFn(fn) {}
+ 
+   /**
+@@ -58,7 +62,11 @@ public:
+    caller's thread — intended for standalone runtimes (e.g. tests) that have
+    no React scheduler.
+    */
+-  SWIFT_RETURNS_RETAINED RuntimeScheduler() {}
++  // Patched for Xcode 26.3 / Swift 6.2.4: SWIFT_RETURNS_RETAINED is no longer
++  // accepted on a constructor. Swift's C++ interop already treats a
++  // SWIFT_SHARED_REFERENCE constructor's result as +1, so dropping the
++  // annotation keeps the ownership semantics identical.
++  RuntimeScheduler() {}
+ 
+   RuntimeScheduler(const RuntimeScheduler &) = delete;
+ 
+diff --git a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift
+index 3d796ee..167d456
+--- a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift
++++ b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Runtime/JavaScriptRuntime.swift
+@@ -185,12 +185,12 @@ open class JavaScriptRuntime: Equatable, Identifiable, @unchecked Sendable {
+       resultPtr: UnsafeMutablePointer<facebook.jsi.Value>
+     ) -> Bool {
+       let propertyName = String(cString: propertyName)
+-      nonisolated(unsafe) let resultPtr = resultPtr
++      let resultPtr = NonisolatedUnsafeValue(resultPtr)
+ 
+       return withGuaranteedContext(context) { (context: HostObjectContext, runtime) in
+         return JavaScriptActor.assumeIsolated {
+           return forwardingSwiftErrorsToJS(runtime: runtime) {
+-            try context.get(propertyName).writeJSIValue(to: resultPtr)
++            try context.get(propertyName).writeJSIValue(to: resultPtr.value)
+           }
+         }
+       }
+@@ -771,22 +771,22 @@ private func createFunctionClosure(
+     // heap-allocated `JavaScriptRef` (Swift 6.2 rejects capturing/consuming a `~Copyable` value in the
+     // escaping closure that `withoutActuallyEscaping` synthesizes), the closure constructs the buffer
+     // locally from the raw pointer + count. Those are read-only call-scoped inputs that never outlive the
+-    // synchronous call, so the `nonisolated(unsafe)` capture is sound. This removes a per-call class
++    // synchronous call, so the unchecked-`Sendable` capture is sound. This removes a per-call class
+     // allocation + retain/release + dealloc that profiling showed dominating the no-op `@JS` host-call
+     // floor.
+-    nonisolated(unsafe) let thisPtr = thisPtr
+-    nonisolated(unsafe) let argumentsPtr = argumentsPtr
+-    nonisolated(unsafe) let resultPtr = resultPtr
++    let thisPtr = NonisolatedUnsafeValue(thisPtr)
++    let argumentsPtr = NonisolatedUnsafeValue(argumentsPtr)
++    let resultPtr = NonisolatedUnsafeValue(resultPtr)
+ 
+     // See `withGuaranteedContext` for why neither the context nor the runtime is retained here, and
+     // why the result is written to the caller's slot instead of being returned.
+     return withGuaranteedContext(context) { (context: HostFunctionContext, runtime) in
+       return JavaScriptActor.assumeIsolated {
+         return forwardingSwiftErrorsToJS(runtime: runtime) {
+-          let this = UnsafeMutablePointer(mutating: thisPtr).move()
+-          let arguments = JavaScriptValuesBuffer(runtime, start: argumentsPtr, count: argumentsCount)
++          let this = UnsafeMutablePointer(mutating: thisPtr.value).move()
++          let arguments = JavaScriptValuesBuffer(runtime, start: argumentsPtr.value, count: argumentsCount)
+           let thisValue = JavaScriptValue(runtime, this)
+-          try context.call(thisValue, consume arguments).writeJSIValue(to: resultPtr)
++          try context.call(thisValue, consume arguments).writeJSIValue(to: resultPtr.value)
+         }
+       }
+     }
+@@ -817,18 +817,18 @@ private func createFunctionClosure(
+     // handed in as a borrowed `JavaScriptUnownedValue` pointing straight at the C++-owned `this` slot:
+     // it is not moved out and no owning `JavaScriptValue` is allocated, so the closure avoids the
+     // per-call `weak`-runtime form/destroy and heap object that the owning `this` pays.
+-    nonisolated(unsafe) let thisPtr = thisPtr
+-    nonisolated(unsafe) let argumentsPtr = argumentsPtr
+-    nonisolated(unsafe) let resultPtr = resultPtr
++    let thisPtr = NonisolatedUnsafeValue(thisPtr)
++    let argumentsPtr = NonisolatedUnsafeValue(argumentsPtr)
++    let resultPtr = NonisolatedUnsafeValue(resultPtr)
+ 
+     // See `withGuaranteedContext` for why neither the context nor the runtime is retained here, and
+     // why the result is written to the caller's slot instead of being returned.
+     return withGuaranteedContext(context) { (context: UnownedThisHostFunctionContext, runtime) in
+       return JavaScriptActor.assumeIsolated {
+         return forwardingSwiftErrorsToJS(runtime: runtime) {
+-          let arguments = JavaScriptValuesBuffer(runtime, start: argumentsPtr, count: argumentsCount)
+-          let thisValue = JavaScriptUnownedValue(runtime.pointee, thisPtr)
+-          try context.call(thisValue, consume arguments).writeJSIValue(to: resultPtr)
++          let arguments = JavaScriptValuesBuffer(runtime, start: argumentsPtr.value, count: argumentsCount)
++          let thisValue = JavaScriptUnownedValue(runtime.pointee, thisPtr.value)
++          try context.call(thisValue, consume arguments).writeJSIValue(to: resultPtr.value)
+         }
+       }
+     }
+diff --git a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Utilities/NonisolatedUnsafeVar.swift b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Utilities/NonisolatedUnsafeVar.swift
+index e9c0c43..a5be3a2
+--- a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Utilities/NonisolatedUnsafeVar.swift
++++ b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI/Utilities/NonisolatedUnsafeVar.swift
+@@ -9,3 +9,21 @@ internal final class NonisolatedUnsafeVar<VarType>: Sendable {
+     self.value = value
+   }
+ }
++
++/// Allocation-free counterpart to ``NonisolatedUnsafeVar`` for values that only need to cross a
++/// concurrency domain, not be mutated across one.
++///
++/// `nonisolated(unsafe)` on a local `let` is not honoured by region isolation in Swift 6.2.4: the
++/// binding stays task-isolated and is rejected as soon as a global-actor-isolated closure captures
++/// it ("sending 'x' risks causing data races"). Wrapping the value in a `Sendable` type sidesteps
++/// the check the same way ``NonisolatedUnsafeVar`` does, but as a struct it costs no per-call class
++/// allocation — which matters on the host-call path, where that allocation was profiled out.
++///
++/// Use with extreme caution as it bypasses Swift's concurrency safety checks.
++internal struct NonisolatedUnsafeValue<Wrapped>: @unchecked Sendable {
++  let value: Wrapped
++
++  init(_ value: Wrapped) {
++    self.value = value
++  }
++}
+diff --git a/node_modules/expo-modules-jsi/apple/scripts/build-xcframework.sh b/node_modules/expo-modules-jsi/apple/scripts/build-xcframework.sh
+index 4c50653..edda988 100755
+--- a/node_modules/expo-modules-jsi/apple/scripts/build-xcframework.sh
++++ b/node_modules/expo-modules-jsi/apple/scripts/build-xcframework.sh
+@@ -291,7 +291,12 @@ build_slice() {
+ 
+   # Remove private/package interfaces which reference package-internal and C++ types
+   # that external consumers can't resolve.
+-  find "${modules_dir}/${PACKAGE_NAME}.swiftmodule" -type f \
++  #
++  # `! -name '._*'` skips AppleDouble sidecars: on a filesystem without xattr
++  # support (exFAT) the `cp -a` above makes a `._x` companion for every file, and
++  # macOS removes it together with `x`, so listing it here only produces
++  # "No such file or directory" warnings for files that are already gone.
++  find "${modules_dir}/${PACKAGE_NAME}.swiftmodule" -type f ! -name '._*' \
+     \( -name '*.private.swiftinterface' -o -name '*.package.swiftinterface' \) -delete
+ 
+   # Strip declarations from public .swiftinterface that external consumers can't resolve:
+@@ -307,11 +312,16 @@ build_slice() {
+   # BSD sed treats the argument after `-i` as the backup suffix, while GNU sed
+   # (e.g. in a Nix shell) treats `''` as the script and the real script as a
+   # filename, failing with "can't read …: No such file or directory".
++  #
++  # `! -name '._*'` skips AppleDouble sidecars, as above — but here it is
++  # load-bearing rather than cosmetic: a sidecar is a binary blob, so `sed`
++  # rejects it with "RE error: illegal byte sequence", and `set -e` then aborts
++  # the whole build.
+   while IFS= read -r swiftinterface; do
+     local stripped_swiftinterface="${swiftinterface}.stripped"
+     sed '/^extension __ObjC\./,/^}/d;/^@usableFromInline$/{N;/_ConstraintThatIsNotPartOfTheAPIOfThisLibrary/d;};/_ConstraintThatIsNotPartOfTheAPIOfThisLibrary/d' "$swiftinterface" > "$stripped_swiftinterface"
+     mv "$stripped_swiftinterface" "$swiftinterface"
+-  done < <(find "${modules_dir}/${PACKAGE_NAME}.swiftmodule" -name '*.swiftinterface')
++  done < <(find "${modules_dir}/${PACKAGE_NAME}.swiftmodule" -name '*.swiftinterface' ! -name '._*')
+ 
+   local headers_dir="${content_root}/Headers"
+   mkdir -p "$headers_dir"

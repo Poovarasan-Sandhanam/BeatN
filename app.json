@@ -1,0 +1,75 @@
+{
+  "expo": {
+    "name": "BeatN",
+    "slug": "BeatN",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "beatn",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.beatn.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "BeatN uses your microphone to record voice journal entries. Recordings are transcribed on this device.",
+        "UIBackgroundModes": [
+          "audio"
+        ]
+      },
+      "appleTeamId": "6J75KC7K4S"
+    },
+    "android": {
+      "package": "com.beatn.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-dev-client",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "BeatN uses your microphone to record voice journal entries. Recordings are transcribed on this device."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
+      ],
+      [
+        "llama.rn",
+        {
+          "enableEntitlements": false,
+          "forceCxx20": true,
+          "enableOpenCLAndHexagon": false
+        }
+      ],
+      [
+        "expo-sqlite",
+        {
+          "enableFTS": true,
+          "withSQLiteVecExtension": true,
+          "useSQLCipher": false
+        }
+      ],
+      "expo-asset"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

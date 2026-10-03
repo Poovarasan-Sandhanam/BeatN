@@ -1,0 +1,66 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# generated native folders (Continuous Native Generation)
+# Regenerate with `npm run prebuild`. Configure native behaviour in app.json
+# and config plugins — never by editing these by hand.
+/ios
+/android
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# tests
+/coverage/
+
+# macOS
+.DS_Store
+*.pem
+
+# macOS AppleDouble sidecars.
+# This repo lives on an exFAT volume, so macOS writes a "._foo" companion for
+# every file. They break CocoaPods and patch-package — see
+# scripts/strip-appledouble.js, which deletes them. Never commit them.
+._*
+.AppleDouble
+.LSOverride
+
+# local env files
+.env
+.env.*
+!.env.example
+
+# typescript
+*.tsbuildinfo
+
+# editors
+.vscode/
+.idea/
+
+# On-device model weights. These are downloaded at runtime into the app's
+# document directory (src/core/models/ModelManager.ts) and are hundreds of MB
+# to multiple GB — they must never enter git.
+*.gguf
+ggml-*.bin

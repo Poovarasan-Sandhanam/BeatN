@@ -1,0 +1,57 @@
+{
+  "name": "beatn",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "dependencies": {
+    "buffer": "^6.0.3",
+    "expo": "~57.0.26",
+    "expo-asset": "~57.0.18",
+    "expo-audio": "~57.0.5",
+    "expo-build-properties": "~57.0.22",
+    "expo-crypto": "~57.0.3",
+    "expo-dev-client": "~57.0.19",
+    "expo-file-system": "~57.0.7",
+    "expo-sqlite": "~57.0.3",
+    "expo-status-bar": "~57.0.1",
+    "llama.rn": "^0.12.9",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "whisper.rn": "^0.7.4",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/jest": "29.5.14",
+    "@types/node": "^26.6.4",
+    "@types/react": "~19.2.2",
+    "jest": "~29.7.0",
+    "jest-expo": "~57.0.5",
+    "patch-package": "^8.0.1",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start --dev-client",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "prebuild": "expo prebuild --clean --no-install && npm run clean:appledouble && npm run pod:install",
+    "typecheck": "tsc --noEmit",
+    "clean:appledouble": "node ./scripts/strip-appledouble.js",
+    "postinstall": "node ./scripts/strip-appledouble.js && patch-package && node ./scripts/strip-appledouble.js",
+    "pod:install": "npm run clean:appledouble && cd ios && pod install",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "private": true,
+  "jest": {
+    "preset": "jest-expo",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/ios/",
+      "/android/",
+      "/\\._"
+    ],
+    "moduleNameMapper": {
+      "^whisper\\.rn/index$": "<rootDir>/jest/mocks/whisper.rn.js",
+      "^llama\\.rn$": "<rootDir>/jest/mocks/llama.rn.js"
+    }
+  }
+}
