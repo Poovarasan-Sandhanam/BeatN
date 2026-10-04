@@ -13,8 +13,10 @@
       "infoPlist": {
         "NSMicrophoneUsageDescription": "BeatN uses your microphone to record voice journal entries. Recordings are transcribed on this device.",
         "UIBackgroundModes": [
+          "audio",
           "audio"
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       },
       "appleTeamId": "6J75KC7K4S"
     },
@@ -27,7 +29,10 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "permissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
       "predictiveBackGestureEnabled": false
     },
@@ -70,6 +75,12 @@
     ],
     "experiments": {
       "typedRoutes": false
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "82f48f58-4416-4d45-abc8-e1b7d1217e36"
+      }
+    },
+    "owner": "poovarasanksp"
   }
 }
