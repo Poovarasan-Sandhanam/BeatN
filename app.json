@@ -13,7 +13,6 @@
       "infoPlist": {
         "NSMicrophoneUsageDescription": "BeatN uses your microphone to record voice journal entries. Recordings are transcribed on this device.",
         "UIBackgroundModes": [
-          "audio",
           "audio"
         ],
         "ITSAppUsesNonExemptEncryption": false

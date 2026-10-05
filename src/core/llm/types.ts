@@ -5,6 +5,12 @@ export interface GenerationOptions {
   stop?: string[];
   /** Streamed tokens, used to measure time-to-first-token. */
   onToken?: (token: string) => void;
+  /**
+   * JSON Schema to constrain sampling with. llama.cpp compiles it to a GBNF
+   * grammar, so output that does not match becomes impossible to emit rather
+   * than something to detect afterwards.
+   */
+  jsonSchema?: object;
 }
 
 export interface GenerationMetrics {
@@ -21,6 +27,15 @@ export interface GenerationResult {
   metrics: GenerationMetrics;
 }
 
+export interface StructuredResult<T> {
+  value: T;
+  raw: string;
+  metrics: GenerationMetrics;
+  attempts: number;
+  /** True when the sampler was grammar-constrained for this result. */
+  grammarConstrained: boolean;
+}
+
 /**
  * UI and feature code depends on this, never on llama.rn directly, so models
  * and runtimes stay swappable per device class.
@@ -34,13 +49,21 @@ export interface LocalLLMEngine {
 
   generate(prompt: string, options?: GenerationOptions): Promise<GenerationResult>;
 
+  /** True when the runtime can constrain sampling to a JSON Schema. */
+  readonly supportsGrammar: boolean;
+
   /**
-   * Generate and parse JSON. The caller supplies the validator so schema
-   * concerns stay in the feature layer rather than in the engine.
+   * Generate and parse JSON.
+   *
+   * The caller supplies both the JSON Schema — used to constrain the sampler
+   * where supported — and a validator, so schema concerns stay in the feature
+   * layer. The grammar guarantees *shape*; the validator still checks
+   * *semantics*, because a value can be well-formed and still wrong.
    */
   generateStructured<T>(
     prompt: string,
+    jsonSchema: object,
     validate: (value: unknown) => T,
     options?: GenerationOptions,
-  ): Promise<{ value: T; raw: string; metrics: GenerationMetrics; attempts: number }>;
+  ): Promise<StructuredResult<T>>;
 }

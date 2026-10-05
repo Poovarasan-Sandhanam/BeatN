@@ -90,5 +90,11 @@ Apply these to the table before writing any Phase 1 code:
 - **JSON attempts routinely 2** — the model is too weak for structured output at
   this quantisation. Try the larger model, or move mood and topics to a
   constrained grammar rather than free JSON.
+  **Actioned 2026-10-05:** structured output failed on a physical iPhone, so
+  attempt 1 is now grammar-constrained — the JSON Schema is compiled to GBNF by
+  llama.cpp, making malformed JSON and invented moods impossible to emit. The
+  benchmark block now reports `JSON grammar: yes (GBNF)`. If attempts are still
+  routinely 2 *with* the grammar on, the model is genuinely too weak and the
+  larger model is the remaining option.
 - **LLM load > ~10 s** — keep the context alive across entries rather than
   loading per request.

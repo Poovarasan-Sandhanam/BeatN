@@ -28,6 +28,8 @@ export interface SpikeBenchmark {
   llmUsedGpu: boolean;
   llmReasonNoGpu: string;
   llmStructuredAttempts: number;
+  /** Whether the sampler was grammar-constrained (GBNF from the JSON Schema). */
+  llmGrammarConstrained: boolean;
 }
 
 export function platformLabel(): { platform: string; osVersion: string } {
@@ -63,5 +65,6 @@ export function formatBenchmark(benchmark: SpikeBenchmark): string {
     `LLM tok/sec:     ${benchmark.llmTokensPerSecond.toFixed(1)}`,
     `LLM GPU:         ${benchmark.llmUsedGpu ? 'yes' : `no (${benchmark.llmReasonNoGpu || 'unspecified'})`}`,
     `JSON attempts:   ${benchmark.llmStructuredAttempts}`,
+    `JSON grammar:    ${benchmark.llmGrammarConstrained ? 'yes (GBNF)' : 'no'}`,
   ].join('\n');
 }

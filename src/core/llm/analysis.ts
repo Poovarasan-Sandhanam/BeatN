@@ -34,6 +34,16 @@ export const EntryAnalysisSchema = z.object({
 
 export type EntryAnalysis = z.infer<typeof EntryAnalysisSchema>;
 
+/**
+ * The same schema as JSON Schema, for constraining the sampler.
+ *
+ * Derived from the Zod schema rather than hand-written, so the grammar and the
+ * validator can never drift apart. llama.cpp compiles this to GBNF; the
+ * `mood` enum is the valuable part, because it makes an invented mood
+ * impossible to emit rather than something to reject afterwards.
+ */
+export const entryAnalysisJsonSchema: object = z.toJSONSchema(EntryAnalysisSchema);
+
 export function validateEntryAnalysis(value: unknown): EntryAnalysis {
   return EntryAnalysisSchema.parse(value);
 }

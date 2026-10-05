@@ -5,6 +5,7 @@ import type {
   GenerationOptions,
   GenerationResult,
   LocalLLMEngine,
+  StructuredResult,
 } from './types';
 
 export interface LlamaEngineOptions {
@@ -53,6 +54,11 @@ export class LlamaEngine implements LocalLLMEngine {
     return this.context?.model?.desc ?? '';
   }
 
+  /** llama.cpp compiles a JSON Schema to a GBNF grammar at sampling time. */
+  get supportsGrammar(): boolean {
+    return true;
+  }
+
   async loadModel(modelPath: string, onProgress?: (percent: number) => void): Promise<void> {
     if (this.context) await this.unloadModel();
 
@@ -90,6 +96,9 @@ export class LlamaEngine implements LocalLLMEngine {
         temperature: options.temperature ?? 0.3,
         top_p: options.topP ?? 0.9,
         stop: options.stop,
+        // Converted to a GBNF grammar by llama.cpp. With this set, the
+        // sampler cannot emit a token that would break the schema.
+        ...(options.jsonSchema ? { json_schema: JSON.stringify(options.jsonSchema) } : {}),
       },
       (data) => {
         if (firstTokenAt === 0) firstTokenAt = Date.now();
@@ -111,24 +120,30 @@ export class LlamaEngine implements LocalLLMEngine {
 
   async generateStructured<T>(
     prompt: string,
+    jsonSchema: object,
     validate: (value: unknown) => T,
     options: GenerationOptions = {},
-  ) {
+  ): Promise<StructuredResult<T>> {
     const maxAttempts = 2;
     let lastError: unknown;
     let lastRaw = '';
     let metrics: GenerationMetrics | null = null;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      // A retry gets a blunter instruction rather than the same prompt again.
-      const attemptPrompt =
-        attempt === 1
-          ? prompt
-          : `${prompt}\n\nYour previous reply was not valid JSON. Reply with the JSON object only. No prose, no markdown fence.`;
+      // Attempt 1 is grammar-constrained, so malformed JSON is impossible and
+      // `mood` can only be a member of the enum. Attempt 2 drops the grammar:
+      // if the model painted itself into a corner under the constraint —
+      // emitting a syntactically valid object that fails semantic validation —
+      // a free run at temperature 0 with a blunter instruction can do better.
+      const useGrammar = attempt === 1;
+      const attemptPrompt = useGrammar
+        ? prompt
+        : `${prompt}\n\nYour previous reply was not valid. Reply with the JSON object only. No prose, no markdown fence.`;
 
       const generated = await this.generate(attemptPrompt, {
         ...options,
-        temperature: attempt === 1 ? (options.temperature ?? 0.2) : 0,
+        temperature: useGrammar ? (options.temperature ?? 0.2) : 0,
+        jsonSchema: useGrammar ? jsonSchema : undefined,
       });
 
       lastRaw = generated.text;
@@ -136,7 +151,13 @@ export class LlamaEngine implements LocalLLMEngine {
 
       try {
         const parsed = JSON.parse(extractJsonObject(generated.text));
-        return { value: validate(parsed), raw: lastRaw, metrics, attempts: attempt };
+        return {
+          value: validate(parsed),
+          raw: lastRaw,
+          metrics,
+          attempts: attempt,
+          grammarConstrained: useGrammar,
+        };
       } catch (error) {
         lastError = error;
       }

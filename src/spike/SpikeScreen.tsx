@@ -12,7 +12,12 @@ import {
 
 import { useWavRecorder, type WavRecording } from '../core/audio/useWavRecorder';
 import { modelRuntime } from '../core/ai/ModelRuntime';
-import { buildAnalysisPrompt, validateEntryAnalysis, type EntryAnalysis } from '../core/llm/analysis';
+import {
+  buildAnalysisPrompt,
+  entryAnalysisJsonSchema,
+  validateEntryAnalysis,
+  type EntryAnalysis,
+} from '../core/llm/analysis';
 import { modelManager } from '../core/models/ModelManager';
 import { modelsOfKind } from '../core/models/catalog';
 import { formatBenchmark, platformLabel, type SpikeBenchmark } from '../core/bench/types';
@@ -127,6 +132,7 @@ export default function SpikeScreen() {
           async (engine) => {
             const result = await engine.generateStructured(
               buildAnalysisPrompt(transcription.text),
+              entryAnalysisJsonSchema,
               validateEntryAnalysis,
               { maxTokens: 300 },
             );
@@ -173,6 +179,7 @@ export default function SpikeScreen() {
           llmUsedGpu: llmStats.usedGpu,
           llmReasonNoGpu: llmStats.reasonNoGpu,
           llmStructuredAttempts: structured.attempts,
+          llmGrammarConstrained: structured.grammarConstrained,
         });
 
         setPhase('done');

@@ -11,7 +11,7 @@ into [IDEAS.md](IDEAS.md) rather than into the codebase.
 | --- | --- | --- |
 | 1a | Defect: Record gated on models being downloaded | ✅ done |
 | 1b | Defect: `metro.config.js` buffer resolution | ✅ done |
-| 1c | Development build onto a physical iPhone | ⬜ blocked — iPhone not connected; set `ios.appleTeamId` to `6J75KC7K4S` |
+| 1c | Development build onto a physical iPhone | ✅ done — via `eas build --profile development` |
 | 1d | Benchmark each model combination | ⬜ |
 | 1e | Written model decision | ⬜ |
 
@@ -81,6 +81,8 @@ models. Parked in [IDEAS.md](IDEAS.md).
 | B5 | sqlite-vec unavailable on iOS (`vec.xcframework` not shipped in expo-sqlite 57.0.3) | medium | ⬜ parked with semantic search |
 | B6 | Model integrity is a 95% size check, not a checksum | low-med | ⬜ |
 | B7 | `recommendedBundle()` never called — no device-tier detection (needs `expo-device`) | low | ⬜ |
+| B8 | Structured output failed on device (`AI_STRUCTURED_OUTPUT_INVALID`) | **high** | ✅ fixed — grammar-constrained sampling via `json_schema` |
+| B9 | Spike screen UX is a developer instrument, not a product | medium | ⬜ chunk 6 |
 | 5 | No deep link to Settings when microphone permission is denied | low | ✅ fixed |
 
 ---
