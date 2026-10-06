@@ -32,6 +32,12 @@ describe('processing state machine', () => {
     }
   });
 
+  it('can reach ready after analysis, since embedding is parked', () => {
+    expect(canTransition('analysed', 'ready')).toBe(true);
+    // The embedding path stays legal for when it is built.
+    expect(canTransition('analysed', 'embedding')).toBe(true);
+  });
+
   it('rejects skipping a step', () => {
     expect(canTransition('recorded', 'ready')).toBe(false);
     expect(canTransition('transcribed', 'embedding')).toBe(false);

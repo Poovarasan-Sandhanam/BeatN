@@ -112,7 +112,10 @@ const TRANSITIONS: Record<ProcessingState, readonly ProcessingState[]> = {
   transcribing: ['transcribed', 'failed'],
   transcribed: ['analysing', 'failed'],
   analysing: ['analysed', 'failed'],
-  analysed: ['embedding', 'failed'],
+  // 'ready' is reachable directly because embedding and memory extraction are
+  // parked (see docs/IDEAS.md). Analysis is currently the last step. When
+  // embedding is built it slots in without changing anything downstream.
+  analysed: ['embedding', 'ready', 'failed'],
   embedding: ['indexed', 'failed'],
   indexed: ['extracting_memories', 'failed'],
   extracting_memories: ['ready', 'failed'],
