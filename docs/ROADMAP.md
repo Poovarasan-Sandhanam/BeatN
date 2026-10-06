@@ -30,7 +30,7 @@ account.
 | 2 | Model bundles — auto-selection, combined weighted progress | ✅ done |
 | 3 | First-run onboarding — one button, blocks recording until done | ✅ done |
 | 4 | SQLite persistence — schema, migrations, repositories | ✅ done |
-| 5 | Job queue — `processing_jobs`, resumes after restart | ⬜ |
+| 5 | Job queue — `processing_jobs`, resumes after restart | ✅ done (not yet wired to the UI) |
 | 6 | Three screens — Home · Record · Entry detail (needs `expo-router`) | ⬜ |
 | 7 | Developer screen — benchmarks, raw output, log, model override | ⬜ |
 
