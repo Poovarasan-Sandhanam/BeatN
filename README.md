@@ -76,4 +76,6 @@ scripts/            exFAT AppleDouble cleanup (see DEVELOPMENT.md)
 | [BENCHMARKS.md](BENCHMARKS.md) | What the spike measures, how to measure it, and the thresholds that decide the models. |
 | [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md) | **The target architecture end to end** — layers, domain model, data core, AI pipeline, RAG, sync, privacy. |
 | [docs/RUNNING.md](docs/RUNNING.md) | **How to actually run it** — ordered manual steps, device setup, and troubleshooting. |
+| [docs/LAUNCH.md](docs/LAUNCH.md) | **Road to launch** — what is done, what is left, and every App Store / Play Store requirement. |
+| [docs/BACKLOG.md](docs/BACKLOG.md) | **Everything outstanding** — what needs you, what is next to build, open defects. |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | **Every build step, phase by phase** — what to learn, what ships, and the exit criteria for each. |
