@@ -9,4 +9,11 @@ config.resolver.extraNodeModules = {
   buffer: require.resolve('buffer/'),
 };
 
+// exFAT cannot store extended attributes, so macOS writes an AppleDouble
+// sidecar (`._name`) next to every file it touches. Those are binary blobs,
+// and Expo Router globs `src/app/**`, so `._record.tsx` was being picked up as
+// a *route* and handed to Babel. Block them at the resolver so no build can
+// see them, whatever the cleanup script missed.
+config.resolver.blockList = [/(^|[/\\])\._[^/\\]*$/];
+
 module.exports = config;
