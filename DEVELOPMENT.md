@@ -111,6 +111,18 @@ Two native-toolchain failures come from this, both already fixed in the repo:
    done
    ```
 
+7. **Expo Router treats AppleDouble sidecars as routes.** The router globs
+   `src/app/**`, so `._record.tsx` becomes a route and is handed to Babel:
+
+```text
+   SyntaxError: /Volumes/ExtremeSSD/BeatN/src/app/._record.tsx:
+     Unexpected character ' '. (1:0)
+   ```
+
+   This one is fixed permanently rather than by cleanup: `metro.config.js`
+   sets `resolver.blockList = [/(^|[/\\])\._[^/\\]*$/]`, so no build can
+   see a sidecar whatever the cleanup script missed.
+
 `scripts/strip-appledouble.js` removes them. It runs as a `postinstall` hook and
 again inside `npm run prebuild` and `npm run pod:install`, and is a no-op off
 macOS. Run it by hand after anything that writes a lot of files:

@@ -70,10 +70,11 @@
           "useSQLCipher": false
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-router"
     ],
     "experiments": {
-      "typedRoutes": false
+      "typedRoutes": true
     },
     "extra": {
       "eas": {
