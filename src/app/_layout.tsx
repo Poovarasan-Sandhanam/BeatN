@@ -75,6 +75,7 @@ function Navigator() {
         options={{ presentation: 'modal', title: 'New entry', headerShown: false }}
       />
       <Stack.Screen name="entry/[id]" options={{ title: '' }} />
+      <Stack.Screen name="dev" options={{ title: 'Developer' }} />
     </Stack>
   );
 }

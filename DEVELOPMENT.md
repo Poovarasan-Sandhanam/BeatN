@@ -123,6 +123,20 @@ Two native-toolchain failures come from this, both already fixed in the repo:
    sets `resolver.blockList = [/(^|[/\\])\._[^/\\]*$/]`, so no build can
    see a sidecar whatever the cleanup script missed.
 
+8. **Expo Router's typed-route generation emits sidecar routes.** Separate
+   from the bundler, so `metro.config.js`'s `blockList` does not help. Stale
+   `.expo/types/router.d.ts` then fails the typecheck with routes that do not
+   exist:
+
+```text
+   Argument of type '"/dev"' is not assignable to parameter of type
+     … | "/._index" | "/._record" | …
+   ```
+
+   `npm run typecheck` and `npm test` therefore run the cleanup first. If the
+   generated types still look wrong, delete `.expo/types` and let the dev
+   server regenerate them.
+
 `scripts/strip-appledouble.js` removes them. It runs as a `postinstall` hook and
 again inside `npm run prebuild` and `npm run pod:install`, and is a no-op off
 macOS. Run it by hand after anything that writes a lot of files:

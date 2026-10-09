@@ -32,7 +32,7 @@ account.
 | 4 | SQLite persistence — schema, migrations, repositories | ✅ done |
 | 5 | Job queue — `processing_jobs`, resumes after restart | ✅ done — wired via `ServiceProvider` |
 | 6 | Three screens — Home · Record · Entry detail | ✅ done (device-untested) |
-| 7 | Developer screen — benchmarks, raw output, log, model override | ⬜ |
+| 7 | Developer screen — benchmarks, raw output, log, model override | ✅ done — long-press the Journal title |
 
 Three screens: **Home** (entry list, empty state), **Record** (big button,
 timer, level, Stop and Cancel), **Entry detail** (transcript, summary, mood,
