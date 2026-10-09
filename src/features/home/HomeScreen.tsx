@@ -72,7 +72,14 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListHeaderComponent={
           <View style={{ gap: theme.spacing.xs, marginBottom: theme.spacing.sm }}>
-            <Text variant="display">Journal</Text>
+            {/* Long-press is the way into developer tools: discoverable if you
+                know, invisible if you do not. */}
+            <Pressable
+              onLongPress={() => router.push('/dev')}
+              delayLongPress={800}
+              accessibilityRole="header">
+              <Text variant="display">Journal</Text>
+            </Pressable>
             <Text variant="caption" tone="muted">
               {entries.length} {entries.length === 1 ? 'entry' : 'entries'} · stored only on this
               phone

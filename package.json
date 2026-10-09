@@ -38,11 +38,11 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "prebuild": "expo prebuild --clean --no-install && npm run clean:appledouble && npm run pod:install",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "npm run clean:appledouble && tsc --noEmit",
     "clean:appledouble": "node ./scripts/strip-appledouble.js",
     "postinstall": "node ./scripts/strip-appledouble.js && patch-package && node ./scripts/strip-appledouble.js",
     "pod:install": "npm run clean:appledouble && cd ios && pod install",
-    "test": "jest",
+    "test": "npm run clean:appledouble && jest",
     "test:watch": "jest --watch"
   },
   "private": true,
