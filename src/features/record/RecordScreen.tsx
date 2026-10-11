@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Linking, StyleSheet, View } from 'react-native';
 
 import { useWavRecorder } from '../../core/audio/useWavRecorder';
 import { useServices } from '../../services/ServiceProvider';
@@ -8,7 +8,6 @@ import { describeError, isPermissionError } from '../../shared/errors';
 import { formatDuration } from '../../shared/format';
 import { useTheme } from '../../shared/theme';
 import { Button, Card, Screen, Text } from '../../shared/ui';
-import { Linking } from 'react-native';
 
 export default function RecordScreen() {
   const theme = useTheme();

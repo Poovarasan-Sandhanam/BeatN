@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { BundleInstaller, type BundleProgress } from '../../core/models/BundleInstaller';
 import type { ModelBundle } from '../../core/models/bundles';
@@ -13,7 +13,9 @@ export type InstallPhase = 'idle' | 'installing' | 'error' | 'done';
  * the user, not silently burn their mobile data a second time.
  */
 export function useBundleInstall(bundle: ModelBundle) {
-  const installer = useRef(new BundleInstaller()).current;
+  // Lazy state, not a ref: `useRef(new X())` constructs on every render and
+  // reading `.current` during render is a lint error.
+  const [installer] = useState(() => new BundleInstaller());
 
   const [phase, setPhase] = useState<InstallPhase>('idle');
   const [progress, setProgress] = useState<BundleProgress | null>(null);
@@ -26,12 +28,24 @@ export function useBundleInstall(bundle: ModelBundle) {
   const [remainingBytes, setRemainingBytes] = useState(0);
 
   useEffect(() => {
-    try {
-      setRemainingBytes(installer.remainingBytes(bundle));
-      if (installer.isInstalled(bundle)) setPhase('done');
-    } catch {
-      // An unreadable models directory is reported by the download attempt.
-    }
+    let cancelled = false;
+    // Deferred to a microtask: these calls stat the filesystem, and setting
+    // state synchronously inside an effect cascades an extra render.
+    void Promise.resolve()
+      .then(() => ({
+        remaining: installer.remainingBytes(bundle),
+        installed: installer.isInstalled(bundle),
+      }))
+      .catch(() => null)
+      .then((result) => {
+        // An unreadable models directory is reported by the download attempt.
+        if (cancelled || !result) return;
+        setRemainingBytes(result.remaining);
+        if (result.installed) setPhase('done');
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [bundle, installer, phase]);
 
   const start = useCallback(async () => {

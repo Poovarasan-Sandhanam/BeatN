@@ -50,8 +50,10 @@ audio playback, and wiring `ProcessingQueue` — built in chunk 5 but
   repository is verified through a recording fake. The claim and
   stale-recovery queries in `ProcessingJobRepository` are the riskiest
   untested code in the project. `sql.js` as a dev dependency would close this.
-- **No ESLint.** Nothing catches unused vars, missing hook deps or stray
-  `console.log` outside `src/__tests__/architecture.test.ts`.
+- ~~No ESLint.~~ **Done.** `npm run lint` is clean. Flat config extending
+  `eslint-config-expo`, with `no-console` and `react-hooks/exhaustive-deps` as
+  errors in `src/`. Pinned to ESLint **9** — `eslint-plugin-react` is not yet
+  compatible with ESLint 10.
 - **`expo-doctor`: 3 packages behind** — `expo` 57.0.26→27, `expo-asset`,
   `expo-sqlite` 57.0.3→4. Upstream patch bumps. `npx expo install --fix`
   resolves it, but invalidates the current EAS build.

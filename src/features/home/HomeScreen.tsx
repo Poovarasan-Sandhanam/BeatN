@@ -17,15 +17,28 @@ export default function HomeScreen() {
   const [entries, setEntries] = useState<JournalEntry[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
-    if (!services) return;
-    setEntries(await services.journal.list());
-  }, [services]);
+  // `isCancelled` lets the effect drop a result that arrived after unmount.
+  const load = useCallback(
+    async (isCancelled: () => boolean = () => false) => {
+      if (!services) return;
+      const next = await services.journal.list();
+      if (!isCancelled()) setEntries(next);
+    },
+    [services],
+  );
 
   // `revision` ticks whenever a job settles, so the list reflects background
   // progress without polling the database.
   useEffect(() => {
-    void load();
+    let cancelled = false;
+    // `load` awaits the database before setting state, so this is not the
+    // synchronous cascade the rule guards against — but the rule cannot see
+    // through the callback. The cancellation guard handles unmount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load(() => cancelled);
+    return () => {
+      cancelled = true;
+    };
   }, [load, services?.revision]);
 
   const onRefresh = useCallback(async () => {

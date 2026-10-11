@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { modelRuntime } from '../../core/ai/ModelRuntime';
 import { useWavRecorder, type WavRecording } from '../../core/audio/useWavRecorder';
@@ -37,13 +37,10 @@ export function useBenchmarkRun(sttModelId: string, llmModelId: string) {
     setLog((previous) => [...previous, line]);
   }, []);
 
-  const modelsReady = useRef({ stt: sttModelId, llm: llmModelId });
-  modelsReady.current = { stt: sttModelId, llm: llmModelId };
-
   const run = useCallback(
     async (recording: WavRecording) => {
-      const stt = modelManager.installed(modelsReady.current.stt);
-      const llm = modelManager.installed(modelsReady.current.llm);
+      const stt = modelManager.installed(sttModelId);
+      const llm = modelManager.installed(llmModelId);
       if (!stt || !llm) {
         setErrorText('Download both selected models first.');
         setPhase('error');
@@ -135,7 +132,7 @@ export function useBenchmarkRun(sttModelId: string, llmModelId: string) {
         setPhase('error');
       }
     },
-    [appendLog],
+    [appendLog, sttModelId, llmModelId],
   );
 
   const toggle = useCallback(async () => {
