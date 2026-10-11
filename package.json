@@ -25,9 +25,12 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@react-native/jest-preset": "^0.86.3",
     "@types/jest": "29.5.14",
     "@types/node": "^26.6.4",
     "@types/react": "~19.2.2",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "~57.0.2",
     "jest": "~29.7.0",
     "jest-expo": "~57.0.5",
     "patch-package": "^8.0.1",
@@ -43,7 +46,9 @@
     "postinstall": "node ./scripts/strip-appledouble.js && patch-package && node ./scripts/strip-appledouble.js",
     "pod:install": "npm run clean:appledouble && cd ios && pod install",
     "test": "npm run clean:appledouble && jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "lint": "npm run clean:appledouble && eslint .",
+    "lint:fix": "npm run clean:appledouble && eslint . --fix"
   },
   "private": true,
   "jest": {

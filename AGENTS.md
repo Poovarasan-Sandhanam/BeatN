@@ -15,16 +15,21 @@ Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
 ```bash
 npx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
 npx expo start              # start the dev server
-npx tsc --noEmit            # typecheck  (npm run typecheck)
-npx jest                    # tests      (npm test)
+npm run typecheck           # tsc --noEmit
+npm test                    # jest
+npm run lint                # eslint
 npx expo-doctor             # diagnose dependency and config issues
 npx expo install --fix      # fix incompatible package versions
 ```
 
 Run **typecheck and tests** before declaring any task done. Both must be clean.
 
-ESLint is not configured in this project yet, so `npx expo lint` does not work —
-do not cite it as a verification step.
+Lint with `npm run lint` (flat config, `eslint-config-expo`). ESLint is pinned
+to **9**: `eslint-plugin-react` breaks on ESLint 10 with
+`contextOrFilename.getFilename is not a function`.
+
+`typecheck`, `test` and `lint` all run the AppleDouble cleanup first — on this
+exFAT volume stale sidecars otherwise break typed-route generation and Jest.
 
 ## Architecture
 

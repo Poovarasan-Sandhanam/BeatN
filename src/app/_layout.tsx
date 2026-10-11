@@ -34,11 +34,18 @@ function Root() {
   // creates the models directory on first launch. A throw during render would
   // blank the screen before the error boundary could catch it.
   useEffect(() => {
-    try {
-      setStartup(new BundleInstaller().isInstalled(bundle) ? 'ready' : 'needsModels');
-    } catch {
-      setStartup('needsModels');
-    }
+    let cancelled = false;
+    // Deferred to a microtask so the state update is not synchronous with the
+    // effect, which would cascade an extra render pass on every launch.
+    void Promise.resolve()
+      .then(() => new BundleInstaller().isInstalled(bundle))
+      .catch(() => false)
+      .then((installed) => {
+        if (!cancelled) setStartup(installed ? 'ready' : 'needsModels');
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Releases model weights when the app backgrounds.

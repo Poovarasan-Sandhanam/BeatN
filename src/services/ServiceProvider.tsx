@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 import { modelRuntime, type ModelRef } from '../core/ai/ModelRuntime';
 import { getOrCreateDeviceId, openDatabase } from '../core/db/connection';
@@ -22,7 +22,7 @@ export interface Services {
 
 const ServiceContext = createContext<Services | null>(null);
 
-type Status = { kind: 'loading' } | { kind: 'ready' } | { kind: 'error'; message: string };
+type Built = Omit<Services, 'revision'>;
 
 /** Resolves the active model for a pipeline step from the installed bundle. */
 function resolveModel(kind: 'stt' | 'llm'): ModelRef | null {
@@ -41,9 +41,11 @@ function resolveModel(kind: 'stt' | 'llm'): ModelRef | null {
  * for anything a previous run left unfinished.
  */
 export function ServiceProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<Status>({ kind: 'loading' });
+  // State, not a ref: the provider must re-render when the services exist,
+  // and reading `ref.current` during render is both unreliable and a lint
+  // error for exactly that reason.
+  const [built, setBuilt] = useState<Built | null>(null);
   const [revision, setRevision] = useState(0);
-  const servicesRef = useRef<Omit<Services, 'revision'> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,12 +83,11 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        servicesRef.current = { journal, queue };
-        setStatus({ kind: 'ready' });
-      } catch (error) {
-        if (cancelled) return;
-        const message = error instanceof Error ? error.message : String(error);
-        setStatus({ kind: 'error', message });
+        setBuilt({ journal, queue });
+      } catch {
+        // Screens render a "not ready" state; the failure surfaces there
+        // rather than being logged, per the privacy rule.
+        if (!cancelled) setBuilt(null);
       }
     })();
 
@@ -96,14 +97,12 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  if (status.kind !== 'ready' || !servicesRef.current) {
+  if (!built) {
     return <ServiceContext.Provider value={null}>{children}</ServiceContext.Provider>;
   }
 
   return (
-    <ServiceContext.Provider value={{ ...servicesRef.current, revision }}>
-      {children}
-    </ServiceContext.Provider>
+    <ServiceContext.Provider value={{ ...built, revision }}>{children}</ServiceContext.Provider>
   );
 }
 

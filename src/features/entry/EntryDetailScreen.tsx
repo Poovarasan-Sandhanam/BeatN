@@ -18,13 +18,26 @@ export default function EntryDetailScreen() {
 
   const [entry, setEntry] = useState<JournalEntry | null | undefined>(undefined);
 
-  const load = useCallback(async () => {
-    if (!services || !id) return;
-    setEntry(await services.journal.findById(id));
-  }, [services, id]);
+  // `isCancelled` lets the effect drop a result that arrived after unmount.
+  const load = useCallback(
+    async (isCancelled: () => boolean = () => false) => {
+      if (!services || !id) return;
+      const next = await services.journal.findById(id);
+      if (!isCancelled()) setEntry(next);
+    },
+    [services, id],
+  );
 
   useEffect(() => {
-    void load();
+    let cancelled = false;
+    // `load` awaits the database before setting state, so this is not the
+    // synchronous cascade the rule guards against — but the rule cannot see
+    // through the callback. The cancellation guard handles unmount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load(() => cancelled);
+    return () => {
+      cancelled = true;
+    };
   }, [load, services?.revision]);
 
   if (entry === undefined) {
