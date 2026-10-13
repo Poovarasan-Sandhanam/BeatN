@@ -98,7 +98,13 @@ export function buildWavHeader(
   return new Uint8Array(header);
 }
 
-/** Concatenate header + samples into a complete in-memory WAV file. */
+/**
+ * Concatenate header + samples into a complete in-memory WAV file.
+ *
+ * Superseded for recording by `WavFileWriter`, which streams to disk instead
+ * of building the whole file in memory. Kept for small one-shot buffers and
+ * because it is the clearest executable description of the format.
+ */
 export function encodeWav(
   samples: Int16Array,
   sampleRate: number = WHISPER_SAMPLE_RATE,
