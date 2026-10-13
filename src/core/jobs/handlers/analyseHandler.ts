@@ -10,7 +10,7 @@ import {
   buildAnalysisPrompt,
   entryAnalysisJsonSchema,
   validateEntryAnalysis,
-} from '../../llm/analysis';
+} from '../../ai/analysis';
 import type { JobHandler } from '../types';
 import { MissingModelError, type HandlerDeps } from './types';
 

@@ -7,8 +7,8 @@
  */
 import * as SQLite from 'expo-sqlite';
 
-import { uuidv7, type RandomSource } from '../../domain/shared/ids';
-import { cryptoRandomSource } from '../platform/randomSource';
+import { uuidv7, type RandomSource } from '../../domain/ids';
+import { cryptoRandomSource } from '../platform';
 import { migrate } from './migrations';
 import type { Database, SqlValue } from './types';
 

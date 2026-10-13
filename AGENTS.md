@@ -33,9 +33,8 @@ exFAT volume stale sidecars otherwise break typed-route generation and Jest.
 
 ## Architecture
 
-Read [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md) before making structural
-changes, and [docs/ROADMAP.md](docs/ROADMAP.md) to see which phase the work
-belongs to.
+Read [docs/PLAN.md](docs/PLAN.md) for what is done and what is next, and
+[docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md) before making structural changes.
 
 The dependency rule is enforced by `src/__tests__/architecture.test.ts` and is
 not negotiable:
@@ -50,9 +49,7 @@ not negotiable:
 
 ## Navigation & Routing
 
-Navigation is **not yet set up** — the app currently renders a single spike
-screen from `App.tsx`. Expo Router arrives with the real UI (ROADMAP Phase 2).
-When it does:
+Expo Router is set up. Routes live in `src/app/`:
 
 - Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files
   define navigators. Keep non-route code outside `src/app/`.

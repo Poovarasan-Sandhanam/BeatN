@@ -1,5 +1,5 @@
 import type { WavRecording } from '../../core/audio/useWavRecorder';
-import { isUuidv7 } from '../../domain/shared/ids';
+import { isUuidv7 } from '../../domain/ids';
 import { JournalService, type JournalServiceDeps } from '../JournalService';
 
 const recording: WavRecording = {

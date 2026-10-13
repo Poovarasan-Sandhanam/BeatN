@@ -10,6 +10,6 @@
  */
 import { getRandomBytes } from 'expo-crypto';
 
-import type { RandomSource } from '../../domain/shared/ids';
+import type { RandomSource } from '../domain/ids';
 
 export const cryptoRandomSource: RandomSource = (byteLength) => getRandomBytes(byteLength);

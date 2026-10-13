@@ -67,7 +67,7 @@ describe('dependency rule: src/domain is pure', () => {
 });
 
 describe('dependency rule: UI does not touch AI runtimes or SQLite', () => {
-  const uiDirs = ['spike', 'features', 'app'].map((d) => join(SRC, d));
+  const uiDirs = ['features', 'app'].map((d) => join(SRC, d));
   const files = uiDirs.flatMap((dir) => {
     try {
       return sourceFiles(dir);
@@ -94,7 +94,7 @@ describe('dependency rule: UI does not touch AI runtimes or SQLite', () => {
 describe('privacy rule: nothing logs to the console', () => {
   // Every shipping directory, not just the engines: a transcript logged from a
   // screen leaks exactly as badly as one logged from a repository.
-  const files = ['core', 'domain', 'shared', 'features', 'spike', 'app'].flatMap((dir) => {
+  const files = ['core', 'domain', 'shared', 'features', 'services', 'app'].flatMap((dir) => {
     try {
       return sourceFiles(join(SRC, dir));
     } catch {

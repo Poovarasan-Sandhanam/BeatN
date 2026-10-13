@@ -1,5 +1,5 @@
 import { getOrCreateDeviceId } from '../connection';
-import { isUuidv7 } from '../../../domain/shared/ids';
+import { isUuidv7 } from '../../../domain/ids';
 import type { Database, SqlRunResult, SqlValue } from '../types';
 
 /** Minimal key-value stand-in for the app_meta table. */
