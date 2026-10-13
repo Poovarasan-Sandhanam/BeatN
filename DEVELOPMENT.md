@@ -137,6 +137,12 @@ Two native-toolchain failures come from this, both already fixed in the repo:
    generated types still look wrong, delete `.expo/types` and let the dev
    server regenerate them.
 
+9. **Jest runs some test files twice.** Watchman on a case-insensitive
+   volume can register one file under two spellings (`deviceId.test.ts` and
+   `deviceid.test.ts`), and Jest then runs both. Nothing fails — the count is
+   just silently wrong. `"watchman": false` in the `jest` block of
+   `package.json` makes Jest use its own crawler instead.
+
 `scripts/strip-appledouble.js` removes them. It runs as a `postinstall` hook and
 again inside `npm run prebuild` and `npm run pod:install`, and is a no-op off
 macOS. Run it by hand after anything that writes a lot of files:
