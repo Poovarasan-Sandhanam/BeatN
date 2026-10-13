@@ -5,7 +5,7 @@ This document records the boundaries that **already hold in the code today**.
 For the architecture BeatN is being built *towards* — the four layers, the
 domain model, the AI pipeline, retrieval, sync and the privacy model — see
 [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md). The phase-by-phase path from
-here to there, with exit criteria, is [docs/ROADMAP.md](docs/ROADMAP.md).
+here to there, with exit criteria, is [docs/PLAN.md](docs/PLAN.md).
 
 ## Layering
 
@@ -110,7 +110,7 @@ These are pure TypeScript, unit-tested without a device:
 The SQLite schema and migrations, FTS5 + sqlite-vec retrieval, the processing
 queue, memory extraction, RAG, Expo Router navigation, the design system,
 notifications, biometric lock, encryption at rest and sync. See
-[docs/ROADMAP.md](docs/ROADMAP.md).
+[docs/PLAN.md](docs/PLAN.md).
 
 `expo-sqlite` is installed and its config plugin is configured for FTS5 and
 sqlite-vec, but **this needs `npm run prebuild` to take effect natively.**

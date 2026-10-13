@@ -1,6 +1,6 @@
 import { LlamaEngine } from '../LlamaEngine';
 import { entryAnalysisJsonSchema, validateEntryAnalysis } from '../analysis';
-import type { GenerationOptions, GenerationResult } from '../types';
+import type { GenerationOptions, GenerationResult } from '../llmTypes';
 
 const VALID = JSON.stringify({
   summary: 'You are weighing up a change of direction.',

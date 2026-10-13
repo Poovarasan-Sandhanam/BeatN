@@ -2,13 +2,13 @@ import { useCallback, useState } from 'react';
 
 import { modelRuntime } from '../../core/ai/ModelRuntime';
 import { useWavRecorder, type WavRecording } from '../../core/audio/useWavRecorder';
-import { platformLabel, type SpikeBenchmark } from '../../core/bench/types';
+import { platformLabel, type SpikeBenchmark } from './benchmark';
 import {
   buildAnalysisPrompt,
   entryAnalysisJsonSchema,
   validateEntryAnalysis,
   type EntryAnalysis,
-} from '../../core/llm/analysis';
+} from '../../core/ai/analysis';
 import { modelManager } from '../../core/models/ModelManager';
 import { describeError } from '../../shared/errors';
 

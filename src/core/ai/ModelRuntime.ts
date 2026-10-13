@@ -15,8 +15,8 @@
  * even if the work throws.
  */
 
-import { LlamaEngine } from '../llm/LlamaEngine';
-import { WhisperEngine } from '../stt/WhisperEngine';
+import { LlamaEngine } from './LlamaEngine';
+import { WhisperEngine } from './WhisperEngine';
 import { InferenceArbiter, type InferencePriority } from './InferenceArbiter';
 import { ModelResidencyManager } from './ModelResidencyManager';
 

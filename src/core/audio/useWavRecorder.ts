@@ -1,4 +1,4 @@
-import { Directory, File, Paths } from 'expo-file-system';
+import { Directory, File, FileMode, Paths } from 'expo-file-system';
 import {
   requestRecordingPermissionsAsync,
   useAudioStream,
@@ -6,13 +6,8 @@ import {
 } from 'expo-audio';
 import { useCallback, useRef, useState } from 'react';
 
-import {
-  WHISPER_CHANNELS,
-  WHISPER_SAMPLE_RATE,
-  encodeWav,
-  peakAmplitude,
-  toWhisperPcm,
-} from './pcm';
+import { WHISPER_CHANNELS, WHISPER_SAMPLE_RATE, peakAmplitude, toWhisperPcm } from './pcm';
+import { WavFileWriter } from './WavFileWriter';
 
 export interface WavRecording {
   /** file:// path to a 16 kHz mono 16-bit PCM WAV. */
@@ -46,7 +41,10 @@ export function useWavRecorder() {
   const [durationMs, setDurationMs] = useState(0);
   const [level, setLevel] = useState(0);
 
-  const chunksRef = useRef<Int16Array[]>([]);
+  // Samples go straight to disk. Nothing accumulates in memory, so a
+  // ten-minute entry costs the same as a ten-second one.
+  const writerRef = useRef<WavFileWriter | null>(null);
+  const fileRef = useRef<File | null>(null);
   const frameCountRef = useRef(0);
   const formatRef = useRef({ sampleRate: WHISPER_SAMPLE_RATE, channels: WHISPER_CHANNELS });
 
@@ -60,7 +58,7 @@ export function useWavRecorder() {
       channels: buffer.channels,
     });
 
-    chunksRef.current.push(normalised);
+    writerRef.current?.append(normalised);
     frameCountRef.current += normalised.length;
 
     setLevel(peakAmplitude(normalised));
@@ -80,12 +78,34 @@ export function useWavRecorder() {
       throw new Error('MICROPHONE_PERMISSION_DENIED');
     }
 
-    chunksRef.current = [];
     frameCountRef.current = 0;
     setDurationMs(0);
     setLevel(0);
 
-    await stream.start();
+    // The file is created now, not at stop: samples are written as they
+    // arrive, so there has to be somewhere to put them.
+    const file = new File(recordingsDirectory(), `${Date.now()}.wav`);
+    file.create({ overwrite: true });
+    const writer = new WavFileWriter(
+      file.open(FileMode.ReadWrite),
+      WHISPER_SAMPLE_RATE,
+      WHISPER_CHANNELS,
+    );
+    writer.start();
+    fileRef.current = file;
+    writerRef.current = writer;
+
+    try {
+      await stream.start();
+    } catch (error) {
+      // Do not leave a stray zero-length file behind.
+      writer.abort();
+      file.delete();
+      writerRef.current = null;
+      fileRef.current = null;
+      throw error;
+    }
+
     setState('recording');
   }, [stream]);
 
@@ -94,40 +114,32 @@ export function useWavRecorder() {
     stream.stop();
     setLevel(0);
 
-    // Everything below runs inside try/finally. Without it, a failed
-    // file.create() or file.write() — a full disk is the realistic case —
-    // skipped setState('idle') and left the recorder wedged in 'finalising'
-    // until the app was relaunched, which killed a whole benchmarking run.
-    try {
-      const chunks = chunksRef.current;
-      chunksRef.current = [];
+    const writer = writerRef.current;
+    const file = fileRef.current;
+    writerRef.current = null;
+    fileRef.current = null;
 
-      const totalSamples = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-      if (totalSamples === 0) {
+    // try/finally: a failed finalise must still return the recorder to idle,
+    // or it wedges until the app is relaunched.
+    try {
+      if (!writer || !file) throw new Error('RECORDING_EMPTY');
+
+      if (writer.frames === 0) {
+        writer.abort();
+        file.delete();
         throw new Error('RECORDING_EMPTY');
       }
 
-      const merged = new Int16Array(totalSamples);
-      let offset = 0;
-      for (const chunk of chunks) {
-        merged.set(chunk, offset);
-        offset += chunk.length;
-      }
-
-      const wav = encodeWav(merged, WHISPER_SAMPLE_RATE, WHISPER_CHANNELS);
-      const file = new File(recordingsDirectory(), `${Date.now()}.wav`);
-      file.create({ overwrite: true });
-      file.write(wav);
+      const { byteLength, durationMs: recordedMs } = writer.finish();
 
       return {
         uri: file.uri,
-        durationMs: Math.round((totalSamples / WHISPER_SAMPLE_RATE) * 1000),
-        byteLength: wav.byteLength,
+        durationMs: recordedMs,
+        byteLength,
         capturedSampleRate: formatRef.current.sampleRate,
         capturedChannels: formatRef.current.channels,
       };
     } finally {
-      // The recorder is reusable whether or not this attempt succeeded.
       frameCountRef.current = 0;
       setState('idle');
     }
@@ -135,7 +147,18 @@ export function useWavRecorder() {
 
   const cancel = useCallback(() => {
     stream.stop();
-    chunksRef.current = [];
+
+    // A cancelled recording leaves a file with a placeholder header, so it is
+    // deleted rather than left for the orphan reaper to find.
+    writerRef.current?.abort();
+    try {
+      fileRef.current?.delete();
+    } catch {
+      // Already gone, or never created.
+    }
+    writerRef.current = null;
+    fileRef.current = null;
+
     frameCountRef.current = 0;
     setDurationMs(0);
     setLevel(0);

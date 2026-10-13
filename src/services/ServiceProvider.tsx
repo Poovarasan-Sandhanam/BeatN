@@ -9,8 +9,8 @@ import { createAnalyseHandler } from '../core/jobs/handlers/analyseHandler';
 import { createTranscribeHandler } from '../core/jobs/handlers/transcribeHandler';
 import { modelManager } from '../core/models/ModelManager';
 import { DEFAULT_BUNDLE_ID, getBundle } from '../core/models/bundles';
-import { uuidv7 } from '../domain/shared/ids';
-import { cryptoRandomSource } from '../core/platform/randomSource';
+import { uuidv7 } from '../domain/ids';
+import { cryptoRandomSource } from '../core/platform';
 import { JournalService } from './JournalService';
 
 export interface Services {

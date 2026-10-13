@@ -514,38 +514,40 @@ property rather than a promise in a privacy policy.
 ```
 src/
   app/                    Expo Router routes — screens only, no logic
-  features/               UI per feature: record, journal, search, ask, insights
+  features/               UI per feature: home, record, entry, onboarding, dev
   services/               application services — orchestration, transactions
-    RecordingService.ts
-    JournalEntryService.ts
-    AskService.ts
+    JournalService.ts     the only thing screens call
+    ServiceProvider.tsx   opens the database, starts the queue
   domain/                 pure TypeScript. No React, no Expo, no SQL.
-    entry/  memory/  model/  shared/
+    entry/  memory/  ids.ts
   core/
-    ai/
-      AIOrchestrator.ts
-      InferenceArbiter.ts
-      ModelResidencyManager.ts
-      ModelRegistry.ts
-      engines/            SpeechToText · TextGeneration · Embedding · Rerank
-      adapters/           WhisperRn · LlamaRnGeneration · LlamaRnEmbedding
-      prompts/            PromptRegistry — versioned, testable
-      structured/         JSON-schema → grammar, Zod validation
-    data/
-      db/                 connection, migrations, schema
-      repositories/       JournalEntry · Memory · Entity · Job · Oplog
-      search/             HybridSearch (FTS5 + vec + RRF + rerank)
-    audio/                capture → PCM → WAV   (exists)
-    jobs/                 ProcessingQueue, handlers, recovery
-    sync/                 oplog, SyncEngine, crypto envelope
-    telemetry/            typed, content-free logger
-    bench/                measurement                        (exists)
+    ai/                   everything model-related
+      engines/types.ts    the ports: STT · generation · embedding · rerank
+      WhisperEngine.ts    speech adapter
+      LlamaEngine.ts      generation adapter
+      analysis.ts         prompt + Zod schema + JSON Schema
+      sttTypes.ts         speech port used by WhisperEngine
+      llmTypes.ts         generation port used by LlamaEngine
+      InferenceArbiter.ts serialises all inference
+      ModelResidencyManager.ts  RAM-budgeted LRU
+      ModelRuntime.ts     owns model lifetime; evicts on background
+      useModelLifecycle.ts
+    audio/                capture → PCM → streamed WAV
+    db/                   connection, migrations, schema, mappers, repositories
+    jobs/                 queue, backoff, handlers
+    models/               catalogue, bundles, download and removal
+    platform.ts           the only place expo-crypto is imported
+  shared/                 theme, UI primitives, errors, formatting
 ```
 
 Test the `domain/` and `core/` layers without a device. That is the point of
 keeping them pure.
 
----
+> **Known duplication.** `core/ai/engines/types.ts` defines a full set of
+> ports, while `sttTypes.ts` and `llmTypes.ts` define the ones the concrete
+> engines actually implement. The two should be collapsed; it is a type change
+> rather than a file move, so it was deliberately left out of the
+> restructuring.
 
 ## 13. Key decisions
 
@@ -576,4 +578,4 @@ keeping them pure.
 | Everything else in this document | ⬜ not started |
 
 **Phase 0 is not complete.** No measurement has been taken on physical hardware,
-so no model choice is settled. See BENCHMARKS.md and ROADMAP.md.
+so no model choice is settled. See BENCHMARKS.md and docs/PLAN.md.

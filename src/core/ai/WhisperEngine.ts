@@ -4,7 +4,7 @@
 // and Metro. Fixed upstream in 0.8.0 — drop the suffix when we move to it.
 import { initWhisper, type WhisperContext } from 'whisper.rn/index';
 
-import type { SpeechToTextEngine, TranscriptionOptions, TranscriptionResult } from './types';
+import type { SpeechToTextEngine, TranscriptionOptions, TranscriptionResult } from './sttTypes';
 
 export interface WhisperEngineOptions {
   /** Core ML on iOS / GPU where available. Disable to benchmark the CPU path. */

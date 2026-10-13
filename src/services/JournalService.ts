@@ -7,7 +7,7 @@
  */
 
 import type { JournalEntry } from '../domain/entry/JournalEntry';
-import { uuidv7, type RandomSource } from '../domain/shared/ids';
+import { uuidv7, type RandomSource } from '../domain/ids';
 import type { JournalEntryRepository } from '../core/db/repositories/JournalEntryRepository';
 import type { ProcessingJobRepository } from '../core/db/repositories/ProcessingJobRepository';
 import type { ProcessingQueue } from '../core/jobs/ProcessingQueue';

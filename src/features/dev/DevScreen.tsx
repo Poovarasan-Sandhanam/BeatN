@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
-import { formatBenchmark } from '../../core/bench/types';
+import { formatBenchmark } from './benchmark';
 import { DEFAULT_BUNDLE_ID, getBundle } from '../../core/models/bundles';
 import { formatBytes, formatDuration } from '../../shared/format';
 import { useTheme } from '../../shared/theme';

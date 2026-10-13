@@ -6,7 +6,7 @@ import type {
   GenerationResult,
   LocalLLMEngine,
   StructuredResult,
-} from './types';
+} from './llmTypes';
 
 export interface LlamaEngineOptions {
   contextSize?: number;
