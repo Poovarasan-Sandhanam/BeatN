@@ -48,7 +48,10 @@
     "test": "npm run clean:appledouble && jest",
     "test:watch": "jest --watch",
     "lint": "npm run clean:appledouble && eslint .",
-    "lint:fix": "npm run clean:appledouble && eslint . --fix"
+    "lint:fix": "npm run clean:appledouble && eslint . --fix",
+    "beta:ios": "bundle exec fastlane ios beta",
+    "beta:android": "bundle exec fastlane android internal",
+    "beta:android:closed": "bundle exec fastlane android closed"
   },
   "private": true,
   "jest": {
@@ -57,12 +60,16 @@
       "/node_modules/",
       "/ios/",
       "/android/",
-      "/\\._"
+      "/\\._",
+      "/vendor/"
     ],
     "moduleNameMapper": {
       "^whisper\\.rn/index$": "<rootDir>/jest/mocks/whisper.rn.js",
       "^llama\\.rn$": "<rootDir>/jest/mocks/llama.rn.js"
     },
-    "watchman": false
+    "watchman": false,
+    "modulePathIgnorePatterns": [
+      "<rootDir>/vendor/"
+    ]
   }
 }

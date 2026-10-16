@@ -98,7 +98,7 @@ back, or delete it after some time?
 | 4.1 | Developer account | ✅ you have it |
 | 4.2 | App record in App Store Connect | ⬜ |
 | 4.3 | Privacy questions, screenshots, description | ⬜ |
-| 4.4 | TestFlight round | ⬜ |
+| 4.4 | TestFlight round | ⬜ lane ready — `npm run beta:ios` |
 | 4.5 | Submit for review | ⬜ |
 
 ### Google — ⚠️ start this early
@@ -107,7 +107,7 @@ back, or delete it after some time?
 | --- | --- | --- |
 | 4.6 | **Play Console account ($25)** | ⬜ **start now** |
 | 4.7 | **Identity verification** — ID, address, phone | ⬜ takes days |
-| 4.8 | **12 testers for 14 days in a row** | ⬜ **14 days of waiting** |
+| 4.8 | **12 testers for 14 days in a row** | ⬜ **14 days of waiting** — lane ready: `npm run beta:android:closed` |
 | 4.9 | Target Android 16 — required since 31 Aug 2026 | ⬜ needs checking |
 | 4.10 | Data safety form, listing, screenshots | ⬜ |
 
