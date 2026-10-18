@@ -64,13 +64,3 @@ yarn-error.*
 # to multiple GB — they must never enter git.
 *.gguf
 ggml-*.bin
-
-# fastlane — credentials and generated output never belong in git
-fastlane/.env
-fastlane/*.json
-fastlane/report.xml
-fastlane/Preview.html
-fastlane/test_output
-build/
-vendor/bundle/
-.bundle/

@@ -28,9 +28,6 @@
   "exclude": [
     "node_modules",
     "ios",
-    "android",
-    "vendor",
-    "build",
-    "fastlane"
+    "android"
   ]
 }

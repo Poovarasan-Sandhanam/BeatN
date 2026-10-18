@@ -1,5 +1,0 @@
-# Identifiers shared by every lane. Credentials are NOT here — they come from
-# environment variables (see fastlane/.env.example), so nothing secret is
-# committed.
-app_identifier("com.beatn.app") # iOS bundle id
-package_name("com.beatn.app")   # Android application id

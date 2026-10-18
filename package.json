@@ -49,9 +49,9 @@
     "test:watch": "jest --watch",
     "lint": "npm run clean:appledouble && eslint .",
     "lint:fix": "npm run clean:appledouble && eslint . --fix",
-    "beta:ios": "bundle exec fastlane ios beta",
-    "beta:android": "bundle exec fastlane android internal",
-    "beta:android:closed": "bundle exec fastlane android closed"
+    "beta:ios": "npx eas-cli@latest build --platform ios --profile beta --auto-submit-with-profile beta",
+    "beta:android": "npx eas-cli@latest build --platform android --profile beta --auto-submit-with-profile beta",
+    "beta:android:closed": "npx eas-cli@latest build --platform android --profile beta --auto-submit-with-profile closed"
   },
   "private": true,
   "jest": {
@@ -60,16 +60,12 @@
       "/node_modules/",
       "/ios/",
       "/android/",
-      "/\\._",
-      "/vendor/"
+      "/\\._"
     ],
     "moduleNameMapper": {
       "^whisper\\.rn/index$": "<rootDir>/jest/mocks/whisper.rn.js",
       "^llama\\.rn$": "<rootDir>/jest/mocks/llama.rn.js"
     },
-    "watchman": false,
-    "modulePathIgnorePatterns": [
-      "<rootDir>/vendor/"
-    ]
+    "watchman": false
   }
 }
