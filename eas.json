@@ -20,6 +20,22 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {},
+    "beta": {
+      "ios": {
+        "appleTeamId": "6J75KC7K4S"
+      },
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
+    },
+    "closed": {
+      "extends": "beta",
+      "android": {
+        "track": "alpha",
+        "releaseStatus": "draft"
+      }
+    }
   }
 }

@@ -9,8 +9,6 @@ module.exports = [
       'ios/*',
       'android/*',
       'node_modules/*',
-      'vendor/*',
-      'build/*',
       // exFAT AppleDouble sidecars are binary, not source. See DEVELOPMENT.md.
       '**/._*',
     ],
