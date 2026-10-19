@@ -1,0 +1,36 @@
+diff --git a/node_modules/expo-modules-jsi/apple/scripts/build-xcframework.sh b/node_modules/expo-modules-jsi/apple/scripts/build-xcframework.sh
+index 4c50653..edda988 100755
+--- a/node_modules/expo-modules-jsi/apple/scripts/build-xcframework.sh
++++ b/node_modules/expo-modules-jsi/apple/scripts/build-xcframework.sh
+@@ -291,7 +291,12 @@ build_slice() {
+ 
+   # Remove private/package interfaces which reference package-internal and C++ types
+   # that external consumers can't resolve.
+-  find "${modules_dir}/${PACKAGE_NAME}.swiftmodule" -type f \
++  #
++  # `! -name '._*'` skips AppleDouble sidecars: on a filesystem without xattr
++  # support (exFAT) the `cp -a` above makes a `._x` companion for every file, and
++  # macOS removes it together with `x`, so listing it here only produces
++  # "No such file or directory" warnings for files that are already gone.
++  find "${modules_dir}/${PACKAGE_NAME}.swiftmodule" -type f ! -name '._*' \
+     \( -name '*.private.swiftinterface' -o -name '*.package.swiftinterface' \) -delete
+ 
+   # Strip declarations from public .swiftinterface that external consumers can't resolve:
+@@ -307,11 +312,16 @@ build_slice() {
+   # BSD sed treats the argument after `-i` as the backup suffix, while GNU sed
+   # (e.g. in a Nix shell) treats `''` as the script and the real script as a
+   # filename, failing with "can't read …: No such file or directory".
++  #
++  # `! -name '._*'` skips AppleDouble sidecars, as above — but here it is
++  # load-bearing rather than cosmetic: a sidecar is a binary blob, so `sed`
++  # rejects it with "RE error: illegal byte sequence", and `set -e` then aborts
++  # the whole build.
+   while IFS= read -r swiftinterface; do
+     local stripped_swiftinterface="${swiftinterface}.stripped"
+     sed '/^extension __ObjC\./,/^}/d;/^@usableFromInline$/{N;/_ConstraintThatIsNotPartOfTheAPIOfThisLibrary/d;};/_ConstraintThatIsNotPartOfTheAPIOfThisLibrary/d' "$swiftinterface" > "$stripped_swiftinterface"
+     mv "$stripped_swiftinterface" "$swiftinterface"
+-  done < <(find "${modules_dir}/${PACKAGE_NAME}.swiftmodule" -name '*.swiftinterface')
++  done < <(find "${modules_dir}/${PACKAGE_NAME}.swiftmodule" -name '*.swiftinterface' ! -name '._*')
+ 
+   local headers_dir="${content_root}/Headers"
+   mkdir -p "$headers_dir"

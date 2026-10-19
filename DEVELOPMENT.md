@@ -143,6 +143,10 @@ Two native-toolchain failures come from this, both already fixed in the repo:
    just silently wrong. `"watchman": false` in the `jest` block of
    `package.json` makes Jest use its own crawler instead.
 
+10. **`patch-package` records exFAT permissions as changes.** exFAT has no
+    Unix permissions, so every file looks executable (755) and a regenerated
+    patch fills up with mode changes. See the `expo-modules-jsi` section below.
+
 `scripts/strip-appledouble.js` removes them. It runs as a `postinstall` hook and
 again inside `npm run prebuild` and `npm run pod:install`, and is a no-op off
 macOS. Run it by hand after anything that writes a lot of files:
@@ -158,40 +162,36 @@ than that.
 
 ## Known toolchain workarounds
 
-### Expo SDK 57 does not compile under Xcode 26.3 (patched)
+### `expo-modules-jsi` patch — now only an exFAT fix
 
-`patches/expo-modules-jsi+57.1.1.patch`, applied by `patch-package` on
+`patches/expo-modules-jsi+57.1.2.patch`, applied by `patch-package` on
 postinstall.
 
-Xcode 26.3 ships Swift 6.2.4, which no longer accepts `SWIFT_RETURNS_RETAINED`
-on a **constructor**. `expo-modules-jsi`'s `RuntimeScheduler.h` annotates both
-of its constructors that way, so the Swift package fails to build and **every**
-iOS build fails — device and simulator alike:
+**History.** On 57.1.1 the patch fixed two errors that stopped *every* iOS
+build under Xcode 26.3 / Swift 6.2.4: `SWIFT_RETURNS_RETAINED` on the
+`RuntimeScheduler` constructors, and `nonisolated(unsafe)` captures rejected
+with "sending '…' risks causing data races". **Both are fixed upstream in
+57.1.2** (expo/expo#51040, changelog dated 2026-10-12), so those parts of the
+patch were dropped.
 
-```text
-RuntimeScheduler.h:53:26: error: 'RuntimeScheduler' cannot be annotated with
-either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED because it is not
-returning a SWIFT_SHARED_REFERENCE type
-```
+**What remains** is one change to `apple/scripts/build-xcframework.sh`: two
+`find` calls gain `! -name '._*'`. Without it, a local build on this exFAT
+volume feeds an AppleDouble sidecar to `sed`, which fails with
+`RE error: illegal byte sequence`, and `set -e` aborts the build. EAS builds
+do not need it but are unaffected by it.
 
-The diagnostic's wording is misleading — the type *is* marked
-`SWIFT_SHARED_REFERENCE`. Moving that attribute to the class head does not help;
-the annotation is simply no longer valid on a constructor.
+**Regenerating a patch on this volume** — `patch-package` diffs file
+permissions as well as content, and exFAT reports every file as executable.
+A naive regeneration of this patch came out at 1,452 lines: 98 permission-only
+changes (644 → 755), four `.orig`/`.rej` files left by a failed apply, and two
+real changes. Before running `npx patch-package <name>`:
 
-The patch removes it from the two constructors. Swift's C++ interop already
-treats a `SWIFT_SHARED_REFERENCE` constructor's result as `+1`, so ownership
-semantics are unchanged — which is presumably why the explicit annotation became
-invalid. Verified in isolation with `swift-frontend -typecheck
--cxx-interoperability-mode=default -swift-version 6` before being applied.
+1. Delete any `*.orig` and `*.rej` files inside the package.
+2. Afterwards, strip every `old mode` / `new mode` line from the patch.
+3. Read the patch. If it touches files you did not edit, it is wrong.
 
-Notes:
-
-- `expo-modules-jsi` 58.0.4 ships the identical header, so upstream has not hit
-  this yet. **Re-check on the next Expo release and drop the patch when it
-  lands.**
-- The `ExpoModulesJSI.xcframework` shipped in the package is a 16 KB stub, and
-  its per-slice `.build-hash` files are empty, so the framework is always built
-  from source locally. There is no prebuilt binary to fall back on.
+Then verify with a clean `npm ci` somewhere off this volume — that is what EAS
+runs, and it is stricter than `npm install`.
 
 ### `whisper.rn` is imported as `whisper.rn/index`
 
