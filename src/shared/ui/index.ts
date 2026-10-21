@@ -1,6 +1,12 @@
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from './Button';
 export { Card, type CardProps } from './Card';
+export { Chip, type ChipProps } from './Chip';
 export { ErrorBoundary } from './ErrorBoundary';
+export { FadeIn, type FadeInProps } from './FadeIn';
+export { Glyph, type GlyphName, type GlyphProps } from './Glyph';
+export { IconButton, type IconButtonProps } from './IconButton';
+export { PressableScale, type PressableScaleProps } from './PressableScale';
 export { ProgressBar, type ProgressBarProps } from './ProgressBar';
 export { Screen, type ScreenProps } from './Screen';
+export { Skeleton, type SkeletonProps } from './Skeleton';
 export { Text, type TextProps } from './Text';

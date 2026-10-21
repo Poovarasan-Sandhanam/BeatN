@@ -1,6 +1,13 @@
 import type { JournalEntry } from '../../../domain/entry/JournalEntry';
 import { PROCESSING_STATES } from '../../../domain/entry/JournalEntry';
-import { describeStatus, formatClockTime, formatEntryDate, previewOf } from '../entryStatus';
+import {
+  describeStatus,
+  formatClockTime,
+  formatEntryDate,
+  previewOf,
+  processingStep,
+  titleOf,
+} from '../entryStatus';
 
 const entry = (overrides: Partial<JournalEntry> = {}): JournalEntry =>
   ({
@@ -101,5 +108,54 @@ describe('formatEntryDate', () => {
 describe('formatClockTime', () => {
   it('renders a 24-hour time', () => {
     expect(formatClockTime(new Date('2026-10-08T09:05:00').getTime())).toMatch(/^\d{2}:\d{2}$/);
+  });
+});
+
+describe('processingStep', () => {
+  it('covers every processing state and only moves forward', () => {
+    let previous = -1;
+    for (const state of PROCESSING_STATES) {
+      const step = processingStep(state);
+      if (state === 'failed') {
+        expect(step).toBeNull();
+        continue;
+      }
+      expect(step).not.toBeNull();
+      expect(step!).toBeGreaterThanOrEqual(previous);
+      previous = step!;
+    }
+  });
+
+  it('is complete only when ready', () => {
+    expect(processingStep('ready')).toBe(3);
+    expect(processingStep('transcribing')).toBe(0);
+  });
+});
+
+describe('titleOf', () => {
+  const provenance = { modelId: 'm', modelVersion: '1', generatedAt: 0 };
+
+  it('prefers the reflection title', () => {
+    const e = entry({
+      reflection: { title: '  A long walk ', summary: 's', provenance },
+      transcript: { text: 'Hello there. More.', language: 'en', provenance },
+    });
+    expect(titleOf(e)).toBe('A long walk');
+  });
+
+  it('falls back to the first sentence of the transcript', () => {
+    const e = entry({ transcript: { text: 'Hello there. More words.', language: 'en', provenance } });
+    expect(titleOf(e)).toBe('Hello there.');
+  });
+
+  it('truncates a long first sentence', () => {
+    const e = entry({ transcript: { text: 'word '.repeat(40), language: 'en', provenance } });
+    const title = titleOf(e)!;
+    expect(title.length).toBeLessThanOrEqual(58);
+    expect(title.endsWith('…')).toBe(true);
+  });
+
+  it('is null with nothing to go on', () => {
+    expect(titleOf(entry())).toBeNull();
   });
 });

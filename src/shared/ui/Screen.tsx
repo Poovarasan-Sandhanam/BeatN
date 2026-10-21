@@ -1,4 +1,5 @@
 import { ScrollView, StyleSheet, View, type ViewProps } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../theme';
 
@@ -7,13 +8,28 @@ export interface ScreenProps extends ViewProps {
   scroll?: boolean;
   /** Centre content vertically — used by onboarding and empty states. */
   centred?: boolean;
+  /**
+   * Pad for the notch and home indicator. Off when a native header already
+   * occupies the top of the screen.
+   */
+  safeArea?: boolean;
 }
 
-export function Screen({ scroll = true, centred = false, children, style, ...rest }: ScreenProps) {
+export function Screen({
+  scroll = true,
+  centred = false,
+  safeArea = true,
+  children,
+  style,
+  ...rest
+}: ScreenProps) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   const content = {
-    padding: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: (safeArea ? insets.top : 0) + theme.spacing.lg,
+    paddingBottom: (safeArea ? insets.bottom : 0) + theme.spacing.xl,
     gap: theme.spacing.lg,
     flexGrow: 1,
     justifyContent: centred ? ('center' as const) : undefined,
@@ -32,6 +48,7 @@ export function Screen({ scroll = true, centred = false, children, style, ...res
       style={[styles.fill, { backgroundColor: theme.colors.background }]}
       contentContainerStyle={[content, style]}
       keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
       {...rest}>
       {children}
     </ScrollView>
