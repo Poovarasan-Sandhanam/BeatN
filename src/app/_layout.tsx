@@ -77,23 +77,31 @@ function Navigator() {
         contentStyle: { backgroundColor: theme.colors.background },
       }}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
+      {/* Full screen, and no swipe-to-dismiss: a stray swipe must never
+          throw away a recording. Closing goes through the screen's own
+          button, which confirms first. */}
       <Stack.Screen
         name="record"
-        options={{ presentation: 'modal', title: 'New entry', headerShown: false }}
+        options={{
+          presentation: 'fullScreenModal',
+          animation: 'slide_from_bottom',
+          gestureEnabled: false,
+          title: 'New entry',
+          headerShown: false,
+        }}
       />
-      <Stack.Screen name="entry/[id]" options={{ title: '' }} />
+      <Stack.Screen name="entry/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="dev" options={{ title: 'Developer' }} />
     </Stack>
   );
 }
 
 function Splash() {
+  const theme = useTheme();
   return (
-    <Screen centred scroll={false}>
-      <ActivityIndicator />
-      <Text variant="caption" tone="muted" align="center">
-        Starting BeatN…
-      </Text>
+    <Screen centred scroll={false} style={{ alignItems: 'center' }}>
+      <Text variant="display">BeatN</Text>
+      <ActivityIndicator color={theme.colors.inkFaint} />
     </Screen>
   );
 }

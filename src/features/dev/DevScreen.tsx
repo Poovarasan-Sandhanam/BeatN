@@ -32,7 +32,7 @@ export default function DevScreen() {
     library.entries.find((e) => e.spec.id === llmModelId)?.installed;
 
   return (
-    <Screen>
+    <Screen safeArea={false}>
       <View style={{ gap: theme.spacing.xs }}>
         <Text variant="display">Developer</Text>
         <Text variant="caption" tone="muted">

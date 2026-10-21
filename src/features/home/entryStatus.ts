@@ -35,6 +35,43 @@ export function describeStatus(state: ProcessingState): EntryStatus {
   }
 }
 
+/** The steps a user sees, in order. Internal states fold into these three. */
+export const PROCESSING_STEPS = ['Transcribe', 'Understand', 'Finish'] as const;
+
+/**
+ * Index into PROCESSING_STEPS of the step in progress. `3` once everything is
+ * done; `null` when processing failed and there is no step to point at.
+ */
+export function processingStep(state: ProcessingState): 0 | 1 | 2 | 3 | null {
+  switch (state) {
+    case 'recorded':
+    case 'transcribing':
+      return 0;
+    case 'transcribed':
+    case 'analysing':
+      return 1;
+    case 'analysed':
+    case 'embedding':
+    case 'indexed':
+    case 'extracting_memories':
+      return 2;
+    case 'ready':
+      return 3;
+    case 'failed':
+      return null;
+  }
+}
+
+/** A headline for the entry: the model's title, else the first sentence spoken. */
+export function titleOf(entry: JournalEntry): string | null {
+  const title = entry.reflection?.title?.trim();
+  if (title) return title;
+  const text = entry.transcript?.text?.trim();
+  if (!text) return null;
+  const firstSentence = text.split(/(?<=[.!?])\s/)[0];
+  return firstSentence.length > 60 ? `${firstSentence.slice(0, 57).trimEnd()}…` : firstSentence;
+}
+
 /** One line for the list: the summary if we have it, else the transcript. */
 export function previewOf(entry: JournalEntry): string | null {
   if (entry.reflection?.summary) return entry.reflection.summary;

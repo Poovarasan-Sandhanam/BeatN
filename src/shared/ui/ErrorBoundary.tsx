@@ -41,9 +41,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
     return (
       <Screen centred scroll={false}>
-        <Text variant="title">Something went wrong.</Text>
+        <Text variant="display">Something went wrong.</Text>
         <Text variant="body" tone="muted">
-          BeatN hit an unexpected error. Your recordings and models are not affected.
+          BeatN hit an unexpected error. Your saved entries are safe.
         </Text>
         <Text variant="mono" tone="faint">
           {error.message}

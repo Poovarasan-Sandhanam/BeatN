@@ -6,18 +6,32 @@ import { Text } from './Text';
 export interface CardProps extends ViewProps {
   /** Optional eyebrow heading above the content. */
   title?: string;
+  /**
+   * `raised` floats on the page with a soft shadow; `tinted` sits in the
+   * accent wash for content the app generated; `flat` is for dense tools.
+   */
+  variant?: 'raised' | 'tinted' | 'flat';
 }
 
-export function Card({ title, children, style, ...rest }: CardProps) {
+export function Card({ title, variant = 'raised', children, style, ...rest }: CardProps) {
   const theme = useTheme();
+
+  const look = {
+    raised: {
+      backgroundColor: theme.colors.surface,
+      borderColor: theme.colors.border,
+      boxShadow: `0 2px 12px ${theme.colors.shadow}`,
+    },
+    tinted: { backgroundColor: theme.colors.accentSoft, borderColor: 'transparent' },
+    flat: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+  }[variant];
 
   return (
     <View
       style={[
         styles.card,
+        look,
         {
-          backgroundColor: theme.colors.surface,
-          borderColor: theme.colors.border,
           borderRadius: theme.radius.lg,
           padding: theme.spacing.lg,
           gap: theme.spacing.md,
@@ -26,7 +40,7 @@ export function Card({ title, children, style, ...rest }: CardProps) {
       ]}
       {...rest}>
       {title !== undefined && (
-        <Text variant="label" tone="muted">
+        <Text variant="label" tone={variant === 'tinted' ? 'accent' : 'muted'}>
           {title}
         </Text>
       )}
