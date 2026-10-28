@@ -20,6 +20,12 @@ export interface JournalServiceDeps {
   deviceId: string;
   random: RandomSource;
   now?: () => number;
+  /**
+   * Called after any change the user made — save, delete, retry. Background
+   * jobs report through the queue; this covers everything else, so a list
+   * reflects the user's own action the moment it lands.
+   */
+  onChange?: () => void;
 }
 
 export class JournalService {
@@ -69,6 +75,7 @@ export class JournalService {
     await this.deps.jobs.enqueue(id, 'transcribe', { priority: 10 });
     // Wake the worker rather than waiting for its next poll.
     this.deps.queue.nudge();
+    this.deps.onChange?.();
 
     return id;
   }
@@ -83,10 +90,12 @@ export class JournalService {
 
   async setFavourite(id: string, isFavourite: boolean): Promise<void> {
     await this.deps.entries.setFavourite(id, isFavourite);
+    this.deps.onChange?.();
   }
 
   async delete(id: string): Promise<void> {
     await this.deps.entries.softDelete(id);
+    this.deps.onChange?.();
   }
 
   /** Re-queue a failed entry at the step that failed. */
@@ -97,5 +106,6 @@ export class JournalService {
     const type = entry.transcript ? 'analyse' : 'transcribe';
     await this.deps.jobs.enqueue(id, type, { priority: 10 });
     this.deps.queue.nudge();
+    this.deps.onChange?.();
   }
 }
