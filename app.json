@@ -17,15 +17,19 @@
         ],
         "ITSAppUsesNonExemptEncryption": false
       },
-      "appleTeamId": "6J75KC7K4S"
+      "appleTeamId": "6J75KC7K4S",
+      "icon": {
+        "light": "./assets/icon.png",
+        "dark": "./assets/icon-dark.png",
+        "tinted": "./assets/icon-tinted.png"
+      }
     },
     "android": {
       "package": "com.beatn.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "monochromeImage": "./assets/android-icon-monochrome.png",
+        "backgroundColor": "#4251A8"
       },
       "permissions": [
         "android.permission.RECORD_AUDIO",
@@ -72,7 +76,20 @@
       ],
       "expo-asset",
       "expo-router",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-mark.png",
+          "imageWidth": 88,
+          "resizeMode": "contain",
+          "backgroundColor": "#F6F3EE",
+          "dark": {
+            "image": "./assets/splash-mark-dark.png",
+            "backgroundColor": "#0F0E11"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
