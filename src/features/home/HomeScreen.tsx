@@ -1,6 +1,15 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Animated, Pressable, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  LayoutAnimation,
+  Pressable,
+  RefreshControl,
+  SectionList,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { JournalEntry } from '../../domain/entry/JournalEntry';
@@ -21,18 +30,30 @@ export default function HomeScreen() {
   const [entries, setEntries] = useState<JournalEntry[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  // How many entries are on screen, read only from the async loader below so
+  // it can tell an added or removed entry apart from a status update.
+  const shownCount = useRef<number | null>(null);
+  useEffect(() => {
+    shownCount.current = entries?.length ?? null;
+  }, [entries]);
+
   // `isCancelled` lets the effect drop a result that arrived after unmount.
   const load = useCallback(
     async (isCancelled: () => boolean = () => false) => {
       if (!services) return;
       const next = await services.journal.list();
-      if (!isCancelled()) setEntries(next);
+      if (isCancelled()) return;
+      // A new or deleted entry slides the list into place instead of jumping.
+      if (shownCount.current !== null && shownCount.current !== next.length) {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      }
+      setEntries(next);
     },
     [services],
   );
 
-  // `revision` ticks whenever a job settles, so the list reflects background
-  // progress without polling the database.
+  // `revision` ticks whenever a job settles or the user saves or deletes an
+  // entry, so the list stays current without polling the database.
   useEffect(() => {
     let cancelled = false;
     // `load` awaits the database before setting state, so this is not the
@@ -235,25 +256,16 @@ function EntryCard({ entry, onPress }: { entry: JournalEntry; onPress: () => voi
   );
 }
 
-/** A chip with a breathing dot: work is happening, nothing is wrong. */
+/** A chip with a spinner: work is happening, nothing is wrong. */
 function BusyChip({ label }: { label: string }) {
   const theme = useTheme();
-  const [pulse] = useState(() => new Animated.Value(0.35));
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 650, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0.35, duration: 650, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulse]);
-
   return (
-    <View style={[styles.busyChip, { backgroundColor: theme.colors.accentSoft, borderRadius: theme.radius.pill }]}>
-      <Animated.View style={[styles.busyDot, { backgroundColor: theme.colors.accent, opacity: pulse }]} />
+    <View
+      accessible
+      accessibilityLabel={label}
+      accessibilityState={{ busy: true }}
+      style={[styles.busyChip, { backgroundColor: theme.colors.accentSoft, borderRadius: theme.radius.pill }]}>
+      <ActivityIndicator size="small" color={theme.colors.accent} style={styles.busySpinner} />
       <Text variant="captionStrong" tone="accent">
         {label}
       </Text>
@@ -397,7 +409,8 @@ const styles = StyleSheet.create({
   stats: { flexDirection: 'row' },
   stat: { flex: 1, borderWidth: StyleSheet.hairlineWidth, gap: 2 },
   busyChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4 },
-  busyDot: { width: 7, height: 7, borderRadius: 4 },
+  // The small indicator is 20pt; scaled to sit on the caption's line height.
+  busySpinner: { transform: [{ scale: 0.7 }], marginLeft: -4, marginRight: -2 },
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center' },
   fab: {
     flexDirection: 'row',

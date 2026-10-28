@@ -150,3 +150,53 @@ describe('delete', () => {
     expect(h.entries.softDelete).toHaveBeenCalledWith('e1');
   });
 });
+
+describe('onChange', () => {
+  // Lists only refetch when told to. A user action that does not notify
+  // leaves a new entry missing, or a deleted one visible, until some
+  // unrelated background job happens to finish.
+  function withChangeLog() {
+    const h = makeService({
+      onChange: () => {
+        h.order.push('onChange');
+      },
+    });
+    return h;
+  }
+
+  it('fires after a new entry is saved and queued, never before', async () => {
+    const h = withChangeLog();
+    await h.service.createEntryFromRecording(recording);
+    expect(h.order).toEqual(['create', 'enqueue:transcribe', 'nudge', 'onChange']);
+  });
+
+  it('fires after a delete lands', async () => {
+    const h = withChangeLog();
+    await h.service.delete('e1');
+    expect(h.order).toEqual(['softDelete', 'onChange']);
+  });
+
+  it('fires after a favourite changes', async () => {
+    const h = withChangeLog();
+    await h.service.setFavourite('e1', true);
+    expect(h.order).toEqual(['onChange']);
+  });
+
+  it('fires after a retry is queued', async () => {
+    const h = withChangeLog();
+    h.entries.findById.mockResolvedValueOnce({ id: 'e1', transcript: null } as never);
+    await h.service.retry('e1');
+    expect(h.order).toEqual(['enqueue:transcribe', 'nudge', 'onChange']);
+  });
+
+  it('stays silent when a retry finds nothing to do', async () => {
+    const h = withChangeLog();
+    await h.service.retry('missing');
+    expect(h.order).toEqual([]);
+  });
+
+  it('is optional', async () => {
+    const h = makeService();
+    await expect(h.service.delete('e1')).resolves.toBeUndefined();
+  });
+});

@@ -16,7 +16,7 @@ import { JournalService } from './JournalService';
 export interface Services {
   journal: JournalService;
   queue: ProcessingQueue;
-  /** Bumped whenever a job settles, so lists can refetch without polling. */
+  /** Bumped whenever a job settles or the user changes an entry, so lists can refetch without polling. */
   revision: number;
 }
 
@@ -59,9 +59,11 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
         const entries = new JournalEntryRepository(db);
         const jobs = new ProcessingJobRepository(db, () => uuidv7(cryptoRandomSource));
 
+        const bumpRevision = () => setRevision((value) => value + 1);
+
         queue = new ProcessingQueue(jobs, {
           // Any settled job may have changed what a list should show.
-          onJobSettled: () => setRevision((value) => value + 1),
+          onJobSettled: bumpRevision,
         });
 
         const handlerDeps = { entries, jobs, runtime: modelRuntime, resolveModel };
@@ -74,6 +76,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
           queue,
           deviceId,
           random: cryptoRandomSource,
+          onChange: bumpRevision,
         });
 
         await queue.start();

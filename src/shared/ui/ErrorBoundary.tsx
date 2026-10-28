@@ -1,6 +1,9 @@
+import * as SplashScreen from 'expo-splash-screen';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 
-import { Button, Screen, Text } from './index';
+import { Button } from './Button';
+import { Screen } from './Screen';
+import { Text } from './Text';
 
 interface Props {
   children: ReactNode;
@@ -29,6 +32,9 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(_error: Error, _info: ErrorInfo): void {
+    // A crash during startup would otherwise leave the launch screen up
+    // forever, hiding this message behind it.
+    SplashScreen.hide();
     // Deliberately not logged: see the privacy rule in SYSTEM_DESIGN.md §10.
     // A crash reporter with content redaction arrives in Phase 11.
   }

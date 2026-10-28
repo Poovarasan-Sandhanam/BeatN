@@ -27,15 +27,18 @@ export default function EntryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [entry, setEntry] = useState<JournalEntry | null | undefined>(undefined);
+  // Set the moment the user confirms a delete. The screen is already on its
+  // way out; reloading now would flash "This entry is gone" mid-animation.
+  const [deleting, setDeleting] = useState(false);
 
   // `isCancelled` lets the effect drop a result that arrived after unmount.
   const load = useCallback(
     async (isCancelled: () => boolean = () => false) => {
-      if (!services || !id) return;
+      if (!services || !id || deleting) return;
       const next = await services.journal.findById(id);
       if (!isCancelled()) setEntry(next);
     },
-    [services, id],
+    [services, id, deleting],
   );
 
   useEffect(() => {
@@ -57,9 +60,12 @@ export default function EntryDetailScreen() {
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: async () => {
-          await services?.journal.delete(entry.id);
+        // Leave first, then delete: the journal updates behind the closing
+        // screen instead of the user waiting on the database to go back.
+        onPress: () => {
+          setDeleting(true);
           router.back();
+          void services?.journal.delete(entry.id);
         },
       },
     ]);
@@ -137,9 +143,15 @@ export default function EntryDetailScreen() {
         {status.busy && step !== null && (
           <FadeIn delay={60}>
             <Card variant="flat">
+              <View style={styles.busyRow}>
+                <ActivityIndicator size="small" color={theme.colors.accent} />
+                <Text variant="bodyStrong" tone="accent">
+                  {status.label}…
+                </Text>
+              </View>
               <Stepper current={step} />
               <Text variant="caption" tone="muted">
-                {status.label}. You can leave — it carries on in the background.
+                You can leave — it carries on in the background.
               </Text>
             </Card>
           </FadeIn>
@@ -317,6 +329,7 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  busyRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   stepper: { flexDirection: 'row', gap: 8 },
   step: { flex: 1 },
   stepBar: { height: 4, borderRadius: 2 },
