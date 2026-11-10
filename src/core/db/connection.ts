@@ -9,6 +9,13 @@ import * as SQLite from 'expo-sqlite';
 
 import { uuidv7, type RandomSource } from '../../domain/ids';
 import { cryptoRandomSource } from '../platform';
+import { getOrCreateDatabaseKey } from '../security/databaseKey';
+import {
+  encryptPlaintextDatabase,
+  inspectDatabaseFile,
+  setAsideUnreadableDatabase,
+  unlockDatabase,
+} from './encryption';
 import { migrate } from './migrations';
 import type { Database, SqlValue } from './types';
 
@@ -40,6 +47,35 @@ function adapt(db: SQLite.SQLiteDatabase): Database {
 }
 
 /**
+ * Opens the encrypted journal, keying it before any other statement runs.
+ *
+ * A plaintext file from a build before encryption is converted once, in
+ * place. A file the key cannot open is set aside rather than deleted, and a
+ * fresh journal started — failing on every launch helps nobody, and the old
+ * file stays recoverable if its key ever comes back.
+ */
+async function openEncrypted(): Promise<SQLite.SQLiteDatabase> {
+  const { key } = await getOrCreateDatabaseKey();
+
+  if (inspectDatabaseFile(DATABASE_NAME) === 'plaintext') {
+    await encryptPlaintextDatabase(DATABASE_NAME, key);
+  }
+
+  const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+  try {
+    await unlockDatabase(db, key);
+    return db;
+  } catch (error) {
+    if (!(error instanceof Error) || error.message !== 'DATABASE_KEY_MISMATCH') throw error;
+    await db.closeAsync();
+    setAsideUnreadableDatabase(DATABASE_NAME);
+    const fresh = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    await unlockDatabase(fresh, key);
+    return fresh;
+  }
+}
+
+/**
  * Opens the database and brings the schema up to date.
  *
  * Concurrent callers share one in-flight open: two screens mounting at once
@@ -51,7 +87,7 @@ export function openDatabase(): Promise<Database> {
 
   if (!opening) {
     opening = (async () => {
-      const db = adapt(await SQLite.openDatabaseAsync(DATABASE_NAME));
+      const db = adapt(await openEncrypted());
       await migrate(db);
       connection = db;
       return db;

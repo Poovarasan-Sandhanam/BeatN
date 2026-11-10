@@ -12,9 +12,6 @@
       "bundleIdentifier": "com.beatn.app",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "BeatN uses your microphone to record voice journal entries. Recordings are transcribed on this device.",
-        "UIBackgroundModes": [
-          "audio"
-        ],
         "ITSAppUsesNonExemptEncryption": false
       },
       "appleTeamId": "6J75KC7K4S",
@@ -22,6 +19,9 @@
         "light": "./assets/icon.png",
         "dark": "./assets/icon-dark.png",
         "tinted": "./assets/icon-tinted.png"
+      },
+      "entitlements": {
+        "com.apple.developer.default-data-protection": "NSFileProtectionComplete"
       }
     },
     "android": {
@@ -33,11 +33,15 @@
       },
       "permissions": [
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE"
+      ],
+      "allowBackup": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -47,7 +51,9 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "BeatN uses your microphone to record voice journal entries. Recordings are transcribed on this device."
+          "microphonePermission": "BeatN uses your microphone to record voice journal entries. Recordings are transcribed on this device.",
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
         }
       ],
       [
@@ -70,8 +76,8 @@
         "expo-sqlite",
         {
           "enableFTS": true,
-          "withSQLiteVecExtension": true,
-          "useSQLCipher": false
+          "withSQLiteVecExtension": false,
+          "useSQLCipher": true
         }
       ],
       "expo-asset",
@@ -88,6 +94,18 @@
             "image": "./assets/splash-mark-dark.png",
             "backgroundColor": "#0F0E11"
           }
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "BeatN uses Face ID to keep your journal private."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "BeatN uses Face ID to keep your journal private."
         }
       ]
     ],
