@@ -22,6 +22,7 @@ export interface ModelStore {
   download(
     modelId: string,
     onProgress?: (info: DownloadProgressInfo) => void,
+    onVerifying?: () => void,
   ): Promise<InstalledModel>;
   cancelDownload(modelId: string): void;
 }
@@ -35,6 +36,8 @@ export interface BundleProgress {
   currentModelId: string | null;
   completedCount: number;
   totalCount: number;
+  /** True while the finished download of `currentModelId` is being checked. */
+  verifying: boolean;
 }
 
 export class BundleInstaller {
@@ -79,7 +82,7 @@ export class BundleInstaller {
       }
     }
 
-    const emit = (currentModelId: string | null, inFlightBytes: number) => {
+    const emit = (currentModelId: string | null, inFlightBytes: number, verifying = false) => {
       const bytesWritten = Math.min(settledBytes + inFlightBytes, totalBytes);
       onProgress?.({
         overall: totalBytes > 0 ? Math.min(1, bytesWritten / totalBytes) : 1,
@@ -88,6 +91,7 @@ export class BundleInstaller {
         currentModelId,
         completedCount,
         totalCount,
+        verifying,
       });
     };
 
@@ -99,10 +103,14 @@ export class BundleInstaller {
       emit(spec.id, 0);
 
       try {
-        await this.store.download(spec.id, ({ bytesWritten }) => {
-          // Clamp: a server may report more than our approximate size.
-          emit(spec.id, Math.min(bytesWritten, spec.approxBytes));
-        });
+        await this.store.download(
+          spec.id,
+          ({ bytesWritten }) => {
+            // Clamp: a server may report more than the catalogued size.
+            emit(spec.id, Math.min(bytesWritten, spec.approxBytes));
+          },
+          () => emit(spec.id, spec.approxBytes, true),
+        );
       } finally {
         this.activeModelId = null;
       }
