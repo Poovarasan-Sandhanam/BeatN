@@ -64,6 +64,8 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
         queue = new ProcessingQueue(jobs, {
           // Any settled job may have changed what a list should show.
           onJobSettled: bumpRevision,
+          // Out of retries: say so, instead of showing "in progress" forever.
+          onJobExhausted: (job, error) => entries.markFailed(job.entryId, error),
         });
 
         const handlerDeps = { entries, jobs, runtime: modelRuntime, resolveModel };
@@ -80,6 +82,9 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
         });
 
         await queue.start();
+        // After start, which returns crashed jobs to the pool: anything still
+        // mid-processing with no job behind it was stranded and needs a retry.
+        await entries.failOrphaned();
 
         if (cancelled) {
           await queue.stop();

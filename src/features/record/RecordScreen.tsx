@@ -1,6 +1,15 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Linking, Pressable, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  AppState,
+  Linking,
+  Pressable,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useWavRecorder } from '../../core/audio/useWavRecorder';
@@ -73,6 +82,17 @@ export default function RecordScreen() {
       setSaving(false);
     }
   }, [recorder, router, services, report]);
+
+  // BeatN has no background audio mode, so the OS cuts the microphone when the
+  // app leaves the foreground. Save what was said rather than lose it — a
+  // locked phone or an incoming call must never cost the user an entry.
+  useEffect(() => {
+    if (!isRecording) return;
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'background') void stop();
+    });
+    return () => subscription.remove();
+  }, [isRecording, stop]);
 
   const discard = useCallback(() => {
     recorder.cancel();

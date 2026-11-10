@@ -1,4 +1,4 @@
-import { describeError, isCancellation, isPermissionError } from '../errors';
+import { GENERIC_MESSAGE, describeError, isCancellation, isPermissionError } from '../errors';
 
 describe('describeError', () => {
   it('maps a known code to plain language', () => {
@@ -11,8 +11,21 @@ describe('describeError', () => {
     expect(describeError('MODEL_DOWNLOAD_FAILED')).toContain('did not finish');
   });
 
-  it('passes an unknown message through', () => {
+  it('passes an unknown message through in development', () => {
     expect(describeError(new Error('SOMETHING_ODD'))).toBe('SOMETHING_ODD');
+  });
+
+  it('never shows an unknown native message in a release build', () => {
+    const globals = globalThis as { __DEV__?: boolean };
+    const previous = globals.__DEV__;
+    globals.__DEV__ = false;
+    try {
+      expect(describeError(new Error('std::exception at /var/mobile/x'))).toBe(GENERIC_MESSAGE);
+      // Known codes are still translated.
+      expect(describeError(new Error('MODEL_DOWNLOAD_CORRUPT'))).toContain('damaged');
+    } finally {
+      globals.__DEV__ = previous;
+    }
   });
 });
 

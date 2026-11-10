@@ -7,6 +7,7 @@ import { StyleSheet, View } from 'react-native';
 import { useModelLifecycle } from '../core/ai/useModelLifecycle';
 import { BundleInstaller } from '../core/models/BundleInstaller';
 import { DEFAULT_BUNDLE_ID, getBundle } from '../core/models/bundles';
+import { AppLock } from '../features/lock/AppLock';
 import OnboardingScreen from '../features/onboarding/OnboardingScreen';
 import { ServiceProvider } from '../services/ServiceProvider';
 import { ThemeProvider, useTheme } from '../shared/theme';
@@ -69,10 +70,13 @@ function Root() {
     return <OnboardingScreen bundle={bundle} onReady={handleReady} />;
   }
 
+  // Onboarding holds no journal content, so only the journal itself is locked.
   return (
-    <ServiceProvider>
-      <Navigator />
-    </ServiceProvider>
+    <AppLock>
+      <ServiceProvider>
+        <Navigator />
+      </ServiceProvider>
+    </AppLock>
   );
 }
 

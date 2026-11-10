@@ -10,7 +10,7 @@
  */
 
 import { backoffMs } from '../../jobs/backoff';
-import type { JobStore, JobType, ProcessingJob } from '../../jobs/types';
+import type { FailOutcome, JobStore, JobType, ProcessingJob } from '../../jobs/types';
 import { JOB_STATUSES, JOB_TYPES } from '../../jobs/types';
 import type { Database, SqlValue } from '../types';
 import { RowMappingError } from '../types';
@@ -168,12 +168,13 @@ export class ProcessingJobRepository implements JobStore {
    * `attempts` is incremented in SQL so the decision is made against the
    * stored value, not a possibly stale one read earlier.
    */
-  async fail(jobId: string, error: string, now: number = this.now()): Promise<void> {
+  async fail(jobId: string, error: string, now: number = this.now()): Promise<FailOutcome> {
     const row = await this.db.getFirstAsync<{ attempts: number; max_attempts: number }>(
       'SELECT attempts, max_attempts FROM processing_jobs WHERE id = ?',
       [jobId],
     );
-    if (!row) return;
+    // Gone: nothing will run it again.
+    if (!row) return 'exhausted';
 
     const attempts = row.attempts + 1;
     const exhausted = attempts >= row.max_attempts;
@@ -193,6 +194,8 @@ export class ProcessingJobRepository implements JobStore {
             WHERE id = ?`,
       params,
     );
+
+    return exhausted ? 'exhausted' : 'retrying';
   }
 
   /**

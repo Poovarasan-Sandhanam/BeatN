@@ -41,13 +41,16 @@ export interface ProcessingJob {
  */
 export type JobHandler = (job: ProcessingJob) => Promise<void>;
 
+/** Whether a failed job will run again, or has used up its attempts. */
+export type FailOutcome = 'retrying' | 'exhausted';
+
 /** The slice of persistence the queue needs. Narrow, so tests can fake it. */
 export interface JobStore {
   claimNext(now: number): Promise<ProcessingJob | null>;
   heartbeat(jobId: string, now: number): Promise<void>;
   complete(jobId: string, now: number): Promise<void>;
   /** Reschedules with backoff, or gives up once maxAttempts is reached. */
-  fail(jobId: string, error: string, now: number): Promise<void>;
+  fail(jobId: string, error: string, now: number): Promise<FailOutcome>;
   /** Returns stale `running` jobs to `pending`. Called once at startup. */
   recoverStale(now: number, staleAfterMs: number): Promise<number>;
 }

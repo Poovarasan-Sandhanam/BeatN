@@ -14,7 +14,9 @@ import {
   describeStatus,
   formatClockTime,
   formatEntryDate,
+  isSilent,
   processingStep,
+  spokenText,
   titleOf,
 } from '../home/entryStatus';
 import { moodLook } from '../home/mood';
@@ -96,6 +98,7 @@ export default function EntryDetailScreen() {
   const status = describeStatus(entry.processingState);
   const step = processingStep(entry.processingState);
   const title = titleOf(entry);
+  const spoken = spokenText(entry);
   const mood = entry.mood && entry.mood.value !== 'unknown' ? moodLook(entry.mood.value, theme.isDark) : null;
 
   return (
@@ -130,7 +133,7 @@ export default function EntryDetailScreen() {
           <Text variant="label" tone="faint">
             {formatEntryDate(entry.createdAt)} · {formatClockTime(entry.createdAt)}
           </Text>
-          <Text variant="display">{title ?? 'Untitled entry'}</Text>
+          <Text variant="display">{title ?? (isSilent(entry) ? 'A quiet moment' : 'Untitled entry')}</Text>
           <View style={styles.chips}>
             <Chip label={formatDuration(entry.audio.durationMs)} />
             {mood && <Chip label={mood.label} dot={mood.color} />}
@@ -164,7 +167,7 @@ export default function EntryDetailScreen() {
                 Processing didn’t finish.
               </Text>
               <Text variant="caption" tone="muted">
-                Your recording is safe.{entry.processingError ? ` ${entry.processingError}` : ''}
+                Your recording is safe. Trying again usually fixes this.
               </Text>
               <Button
                 label="Try again"
@@ -200,9 +203,16 @@ export default function EntryDetailScreen() {
             <Text variant="label" tone="muted">
               What you said
             </Text>
-            <Text variant="reading" selectable>
-              {entry.transcript.text}
-            </Text>
+            {spoken ? (
+              <Text variant="reading" selectable>
+                {spoken}
+              </Text>
+            ) : (
+              <Text variant="body" tone="muted">
+                No speech was picked up in this recording. If you did speak, check that BeatN
+                can use the microphone in Settings.
+              </Text>
+            )}
           </FadeIn>
         )}
       </ScrollView>

@@ -39,10 +39,21 @@ export class ModelManager {
     const file = this.fileFor(modelId);
     if (!file.exists) return false;
 
-    // A download killed mid-flight leaves a short file behind; treat anything
-    // well under the expected size as absent rather than loading a broken model.
-    const spec = getModelSpec(modelId);
-    return file.size >= spec.approxBytes * 0.95;
+    // Exact size, not "close enough": a download killed mid-flight leaves a
+    // short file, and loading a truncated model fails in confusing ways.
+    // Contents are checked once, after download — see `verify`.
+    return file.size === getModelSpec(modelId).bytes;
+  }
+
+  /**
+   * Hashes the file and compares it with the catalog. Native MD5 over 64 KB
+   * chunks: seconds even for the 1.1 GB model, but synchronous, so callers
+   * should let the UI paint a "checking" state first.
+   */
+  verify(modelId: string): boolean {
+    const file = this.fileFor(modelId);
+    if (!file.exists) return false;
+    return file.info({ md5: true }).md5 === getModelSpec(modelId).md5;
   }
 
   installed(modelId: string): InstalledModel | null {
@@ -60,6 +71,7 @@ export class ModelManager {
   async download(
     modelId: string,
     onProgress?: (info: DownloadProgressInfo) => void,
+    onVerifying?: () => void,
   ): Promise<InstalledModel> {
     const spec = getModelSpec(modelId);
 
@@ -95,9 +107,20 @@ export class ModelManager {
       this.tasks.delete(modelId);
     }
 
+    if (!destination.exists) throw new Error('MODEL_DOWNLOAD_FAILED');
+
     if (!this.isInstalled(modelId)) {
-      if (destination.exists) destination.delete();
-      throw new Error('MODEL_DOWNLOAD_FAILED');
+      destination.delete();
+      throw new Error('MODEL_DOWNLOAD_INCOMPLETE');
+    }
+
+    onVerifying?.();
+    // One frame for the "checking" state to reach the screen before hashing.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    if (!this.verify(modelId)) {
+      // Never leave a damaged model where the engine would load it.
+      destination.delete();
+      throw new Error('MODEL_DOWNLOAD_CORRUPT');
     }
 
     return this.installed(modelId)!;

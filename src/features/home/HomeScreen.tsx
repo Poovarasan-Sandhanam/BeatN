@@ -17,7 +17,7 @@ import { useServices } from '../../services/ServiceProvider';
 import { formatDuration } from '../../shared/format';
 import { useTheme } from '../../shared/theme';
 import { Button, Chip, FadeIn, Glyph, PressableScale, Skeleton, Text } from '../../shared/ui';
-import { describeStatus, formatClockTime, formatEntryDate, previewOf } from './entryStatus';
+import { describeStatus, formatClockTime, formatEntryDate, isSilent, previewOf } from './entryStatus';
 import { computeInsights, formatLongDate, greetingFor, groupByDay } from './journalInsights';
 import { moodLook } from './mood';
 
@@ -141,7 +141,11 @@ export default function HomeScreen() {
               <View style={[styles.stats, { gap: theme.spacing.sm }]}>
                 <StatTile value={insights.streakDays} label="day streak" />
                 <StatTile value={insights.thisWeek} label="this week" />
-                <StatTile value={insights.totalMinutes} label={insights.totalMinutes === 1 ? 'minute' : 'minutes'} />
+                {/* Under a minute in total reads as "<1", not a discouraging zero. */}
+                <StatTile
+                  value={insights.totalMinutes === 0 && entries.length > 0 ? '<1' : insights.totalMinutes}
+                  label={insights.totalMinutes === 1 ? 'minute' : 'minutes'}
+                />
               </View>
             </FadeIn>
           </View>
@@ -172,7 +176,7 @@ export default function HomeScreen() {
   );
 }
 
-function StatTile({ value, label }: { value: number; label: string }) {
+function StatTile({ value, label }: { value: number | string; label: string }) {
   const theme = useTheme();
   return (
     <View
@@ -239,7 +243,7 @@ function EntryCard({ entry, onPress }: { entry: JournalEntry; onPress: () => voi
         </Text>
       ) : (
         <Text variant="reading" tone="faint">
-          Listening back to what you said…
+          {isSilent(entry) ? 'No speech picked up' : 'Listening back to what you said…'}
         </Text>
       )}
 

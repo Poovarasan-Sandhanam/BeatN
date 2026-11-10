@@ -1,4 +1,5 @@
 import type { JournalEntry, ProcessingState } from '../../domain/entry/JournalEntry';
+import { cleanTranscript } from '../../domain/entry/transcript';
 
 export interface EntryStatus {
   label: string;
@@ -66,7 +67,7 @@ export function processingStep(state: ProcessingState): 0 | 1 | 2 | 3 | null {
 export function titleOf(entry: JournalEntry): string | null {
   const title = entry.reflection?.title?.trim();
   if (title) return title;
-  const text = entry.transcript?.text?.trim();
+  const text = spokenText(entry);
   if (!text) return null;
   const firstSentence = text.split(/(?<=[.!?])\s/)[0];
   return firstSentence.length > 60 ? `${firstSentence.slice(0, 57).trimEnd()}…` : firstSentence;
@@ -75,7 +76,8 @@ export function titleOf(entry: JournalEntry): string | null {
 /** One line for the list: the summary if we have it, else the transcript. */
 export function previewOf(entry: JournalEntry): string | null {
   if (entry.reflection?.summary) return entry.reflection.summary;
-  if (entry.transcript?.text) return entry.transcript.text;
+  const spoken = spokenText(entry);
+  if (spoken) return spoken;
   return null;
 }
 
@@ -104,4 +106,18 @@ export function formatClockTime(timestamp: number): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+/**
+ * What the user actually said, with non-speech tags removed. Cleaned here too
+ * so entries transcribed before the cleaner existed display properly.
+ */
+export function spokenText(entry: JournalEntry): string | null {
+  if (!entry.transcript) return null;
+  return cleanTranscript(entry.transcript.text) || null;
+}
+
+/** Transcribed, and nothing in it: the recording held no speech. */
+export function isSilent(entry: JournalEntry): boolean {
+  return entry.transcript !== null && spokenText(entry) === null;
 }

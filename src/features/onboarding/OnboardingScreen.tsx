@@ -41,9 +41,11 @@ export default function OnboardingScreen({ bundle, onReady }: OnboardingScreenPr
   const currentLabel =
     progress?.currentModelId === undefined || progress?.currentModelId === null
       ? 'Preparing…'
-      : getModelSpec(progress.currentModelId).kind === 'stt'
-        ? 'Downloading speech model'
-        : 'Downloading language model';
+      : progress.verifying
+        ? 'Checking download…'
+        : getModelSpec(progress.currentModelId).kind === 'stt'
+          ? 'Downloading speech model'
+          : 'Downloading language model';
 
   return (
     <Screen>

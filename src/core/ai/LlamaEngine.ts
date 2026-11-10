@@ -29,6 +29,14 @@ export class LlamaEngine implements LocalLLMEngine {
   private context: LlamaContext | null = null;
   private loadTimeMs = 0;
   private readonly options: Required<LlamaEngineOptions>;
+  /** Kept so the model can be reloaded on the CPU if the GPU path fails. */
+  private modelPath: string | null = null;
+  /**
+   * Set after a GPU run fails. Sticky for the life of the engine: a device
+   * whose GPU path broke once (the iOS simulator, older Metal drivers) will
+   * break again, and a reload costs seconds.
+   */
+  private cpuOnly = false;
 
   constructor(options: LlamaEngineOptions = {}) {
     this.options = { ...DEFAULTS, ...options };
@@ -63,11 +71,12 @@ export class LlamaEngine implements LocalLLMEngine {
     if (this.context) await this.unloadModel();
 
     const startedAt = Date.now();
+    this.modelPath = modelPath;
     this.context = await initLlama(
       {
         model: modelPath,
         n_ctx: this.options.contextSize,
-        n_gpu_layers: this.options.gpuLayers,
+        n_gpu_layers: this.cpuOnly ? 0 : this.options.gpuLayers,
         n_threads: this.options.threads,
       },
       onProgress,
@@ -83,6 +92,19 @@ export class LlamaEngine implements LocalLLMEngine {
   }
 
   async generate(prompt: string, options: GenerationOptions = {}): Promise<GenerationResult> {
+    try {
+      return await this.complete(prompt, options);
+    } catch (error) {
+      // GPU offload is the least portable part of llama.cpp. If it fails,
+      // retry once on the CPU: slower, but an answer beats a failed entry.
+      if (this.cpuOnly || this.options.gpuLayers === 0 || !this.modelPath) throw error;
+      this.cpuOnly = true;
+      await this.loadModel(this.modelPath);
+      return this.complete(prompt, options);
+    }
+  }
+
+  private async complete(prompt: string, options: GenerationOptions): Promise<GenerationResult> {
     const context = this.context;
     if (!context) throw new Error('LLM_MODEL_NOT_LOADED');
 
@@ -140,11 +162,21 @@ export class LlamaEngine implements LocalLLMEngine {
         ? prompt
         : `${prompt}\n\nYour previous reply was not valid. Reply with the JSON object only. No prose, no markdown fence.`;
 
-      const generated = await this.generate(attemptPrompt, {
-        ...options,
-        temperature: useGrammar ? (options.temperature ?? 0.2) : 0,
-        jsonSchema: useGrammar ? jsonSchema : undefined,
-      });
+      let generated: GenerationResult;
+      try {
+        generated = await this.generate(attemptPrompt, {
+          ...options,
+          temperature: useGrammar ? (options.temperature ?? 0.2) : 0,
+          jsonSchema: useGrammar ? jsonSchema : undefined,
+        });
+      } catch (error) {
+        // A native error under the grammar (llama.cpp's schema-to-grammar
+        // path throws on schemas it cannot compile) must still leave the
+        // unconstrained attempt to try. Without the grammar, it is final.
+        if (!useGrammar) throw error;
+        lastError = error;
+        continue;
+      }
 
       lastRaw = generated.text;
       metrics = generated.metrics;

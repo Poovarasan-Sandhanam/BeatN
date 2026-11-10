@@ -11,6 +11,7 @@ import {
   entryAnalysisJsonSchema,
   validateEntryAnalysis,
 } from '../../ai/analysis';
+import { cleanTranscript } from '../../../domain/entry/transcript';
 import type { JobHandler } from '../types';
 import { MissingModelError, type HandlerDeps } from './types';
 
@@ -30,6 +31,25 @@ export function createAnalyseHandler({
     // Already analysed by an earlier run of this job.
     if (entry.reflection && entry.processingState === 'ready') return;
 
+    // Cleaned here as well as at transcription, so entries saved before the
+    // cleaner existed do not send "[BLANK_AUDIO]" to the model.
+    const transcript = cleanTranscript(entry.transcript.text);
+    if (transcript === '') {
+      // No speech: finish without a reflection rather than ask the model to
+      // summarise nothing. Walk the legal path from wherever the entry is.
+      if (entry.processingState === 'ready') return;
+      if (entry.processingState === 'transcribed') {
+        await entries.setProcessingState(entry.id, 'transcribed', 'ready');
+        return;
+      }
+      if (entry.processingState === 'failed') {
+        await entries.setProcessingState(entry.id, 'failed', 'analysing');
+      }
+      await entries.setProcessingState(entry.id, 'analysing', 'analysed');
+      await entries.setProcessingState(entry.id, 'analysed', 'ready');
+      return;
+    }
+
     const model = resolveModel('llm');
     if (!model) throw new MissingModelError('llm');
 
@@ -37,7 +57,6 @@ export function createAnalyseHandler({
       await entries.setProcessingState(entry.id, entry.processingState, 'analysing');
     }
 
-    const transcript = entry.transcript.text;
     const structured = await runtime.useLlm(
       model,
       (engine) =>

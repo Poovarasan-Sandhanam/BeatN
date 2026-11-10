@@ -21,6 +21,7 @@ class FakeStore implements ModelStore {
   async download(
     modelId: string,
     onProgress?: (info: { bytesWritten: number; totalBytes: number; percent: number }) => void,
+    onVerifying?: () => void,
   ) {
     this.downloadOrder.push(modelId);
     const spec = getModelSpec(modelId);
@@ -33,6 +34,7 @@ class FakeStore implements ModelStore {
     );
     // Emit a midpoint tick, then complete.
     this.emitters.get(modelId)?.({ bytesWritten: Math.floor(spec.approxBytes / 2) });
+    onVerifying?.();
     this.installed.add(modelId);
     return { spec, path: `/models/${modelId}`, sizeBytes: spec.approxBytes };
   }
@@ -151,5 +153,17 @@ describe('BundleInstaller', () => {
 
     await expect(installer.install(bundle)).rejects.toThrow('BUNDLE_INSTALL_CANCELLED');
     expect(store.cancelled).toEqual([bundle.sttModelId]);
+  });
+
+  it('reports a checking phase after each download, at full progress for that model', async () => {
+    const store = new FakeStore();
+    const events: BundleProgress[] = [];
+    await new BundleInstaller(store).install(bundle, (p) => events.push(p));
+
+    const checking = events.filter((p) => p.verifying);
+    expect(checking.map((p) => p.currentModelId)).toEqual([bundle.sttModelId, bundle.llmModelId]);
+    expect(checking[0].bytesWritten).toBe(sttBytes);
+    // Only the checking ticks carry the flag.
+    expect(events.filter((p) => !p.verifying).length).toBeGreaterThan(0);
   });
 });

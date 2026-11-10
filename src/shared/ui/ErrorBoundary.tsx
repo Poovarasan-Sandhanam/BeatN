@@ -20,9 +20,9 @@ interface State {
  * otherwise show as white nothing. This at least names the failure and offers
  * a way back.
  *
- * The message is shown because this is a development build used for
- * benchmarking. Before release it becomes a generic apology — an error string
- * can contain a file path, and must never contain journal content.
+ * The raw message is shown in development builds only. Release builds show
+ * the generic apology alone — an error string can contain a file path, and
+ * must never contain journal content.
  */
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null };
@@ -51,9 +51,13 @@ export class ErrorBoundary extends Component<Props, State> {
         <Text variant="body" tone="muted">
           BeatN hit an unexpected error. Your saved entries are safe.
         </Text>
-        <Text variant="mono" tone="faint">
-          {error.message}
-        </Text>
+        {/* Development builds only. In release the message stays hidden: it
+            can contain a file path, and must never risk showing content. */}
+        {__DEV__ && (
+          <Text variant="mono" tone="faint">
+            {error.message}
+          </Text>
+        )}
         <Button label="Try again" onPress={this.reset} />
       </Screen>
     );
