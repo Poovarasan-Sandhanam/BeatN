@@ -212,6 +212,44 @@ export class JournalEntryRepository {
     );
   }
 
+  /**
+   * Give up on an entry whose processing will not be retried automatically.
+   *
+   * Unlike `setProcessingState` this does not need to know the current state:
+   * every in-progress state may move to `failed`, and the caller (a job that
+   * ran out of attempts) cannot know which step the entry reached.
+   */
+  async markFailed(id: string, error: string): Promise<void> {
+    await this.db.runAsync(
+      `UPDATE journal_entries
+          SET processing_state = 'failed', processing_error = ?, updated_at = ?, version = version + 1
+        WHERE id = ? AND deleted_at IS NULL AND processing_state NOT IN ('ready', 'failed')`,
+      [error, this.now(), id],
+    );
+  }
+
+  /**
+   * Fail every entry that is mid-processing with no job left to finish it.
+   *
+   * Run once at startup, after stale jobs are recovered. Catches entries a
+   * crash or an older build stranded — without it they show a spinner forever
+   * and never offer "Try again". Returns how many entries were failed.
+   */
+  async failOrphaned(error = 'PROCESSING_INTERRUPTED'): Promise<number> {
+    const result = await this.db.runAsync(
+      `UPDATE journal_entries
+          SET processing_state = 'failed', processing_error = ?, updated_at = ?, version = version + 1
+        WHERE deleted_at IS NULL
+          AND processing_state NOT IN ('ready', 'failed')
+          AND NOT EXISTS (
+            SELECT 1 FROM processing_jobs j
+             WHERE j.entry_id = journal_entries.id AND j.status IN ('pending', 'running')
+          )`,
+      [error, this.now()],
+    );
+    return result.changes;
+  }
+
   async countLive(): Promise<number> {
     const row = await this.db.getFirstAsync<{ count: number }>(
       'SELECT COUNT(*) AS count FROM journal_entries WHERE deleted_at IS NULL',

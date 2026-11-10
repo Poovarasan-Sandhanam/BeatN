@@ -38,6 +38,12 @@ describe('processing state machine', () => {
     expect(canTransition('analysed', 'embedding')).toBe(true);
   });
 
+  it('lets a silent recording skip analysis', () => {
+    expect(canTransition('transcribed', 'ready')).toBe(true);
+    // Only an empty transcript takes this path; speech must still be analysed.
+    expect(canTransition('transcribing', 'ready')).toBe(false);
+  });
+
   it('rejects skipping a step', () => {
     expect(canTransition('recorded', 'ready')).toBe(false);
     expect(canTransition('transcribed', 'embedding')).toBe(false);

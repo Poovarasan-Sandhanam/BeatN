@@ -240,3 +240,29 @@ describe('reads exclude deleted entries', () => {
     expect(await new JournalEntryRepository(db).countLive()).toBe(0);
   });
 });
+
+describe('markFailed', () => {
+  it('fails from any in-progress state, but never a finished or deleted entry', async () => {
+    const db = new RecordingDatabase();
+    await new JournalEntryRepository(db, () => 5_000).markFailed('entry-1', 'BOOM');
+
+    expect(db.run[0].sql).toContain("SET processing_state = 'failed'");
+    expect(db.run[0].sql).toContain("processing_state NOT IN ('ready', 'failed')");
+    expect(db.run[0].sql).toContain('deleted_at IS NULL');
+    expect(db.run[0].params).toEqual(['BOOM', 5_000, 'entry-1']);
+  });
+});
+
+describe('failOrphaned', () => {
+  it('only fails entries with no pending or running job left', async () => {
+    const db = new RecordingDatabase();
+    await new JournalEntryRepository(db, () => 6_000).failOrphaned();
+
+    const { sql, params } = db.run[0];
+    expect(sql).toContain('NOT EXISTS');
+    expect(sql).toContain("j.status IN ('pending', 'running')");
+    expect(sql).toContain("processing_state NOT IN ('ready', 'failed')");
+    expect(sql).toContain('deleted_at IS NULL');
+    expect(params).toEqual(['PROCESSING_INTERRUPTED', 6_000]);
+  });
+});

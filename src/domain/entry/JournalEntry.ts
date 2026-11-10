@@ -110,7 +110,9 @@ export type ProcessingState = (typeof PROCESSING_STATES)[number];
 const TRANSITIONS: Record<ProcessingState, readonly ProcessingState[]> = {
   recorded: ['transcribing', 'failed'],
   transcribing: ['transcribed', 'failed'],
-  transcribed: ['analysing', 'failed'],
+  // Straight to 'ready' when the recording held no speech: there is nothing
+  // to analyse, and running the model on an empty prompt only invents things.
+  transcribed: ['analysing', 'ready', 'failed'],
   analysing: ['analysed', 'failed'],
   // 'ready' is reachable directly because embedding and memory extraction are
   // parked (see docs/IDEAS.md). Analysis is currently the last step. When

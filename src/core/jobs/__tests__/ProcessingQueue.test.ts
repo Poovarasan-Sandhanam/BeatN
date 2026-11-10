@@ -1,5 +1,5 @@
 import { ProcessingQueue } from '../ProcessingQueue';
-import type { JobStore, JobType, ProcessingJob } from '../types';
+import type { FailOutcome, JobStore, JobType, ProcessingJob } from '../types';
 
 const job = (overrides: Partial<ProcessingJob> = {}): ProcessingJob => ({
   id: 'job-1',
@@ -27,6 +27,8 @@ class FakeStore implements JobStore {
   recovered = 0;
   recoverCalls = 0;
   claimError: Error | null = null;
+  /** What `fail` reports. Retrying by default, like a first failure. */
+  failOutcome: FailOutcome = 'retrying';
 
   constructor(private queued: ProcessingJob[] = []) {}
 
@@ -47,8 +49,9 @@ class FakeStore implements JobStore {
     this.completed.push(jobId);
   }
 
-  async fail(jobId: string, error: string): Promise<void> {
+  async fail(jobId: string, error: string): Promise<FailOutcome> {
     this.failed.push({ id: jobId, error });
+    return this.failOutcome;
   }
 
   async recoverStale(): Promise<number> {
@@ -161,6 +164,59 @@ describe('ProcessingQueue', () => {
     await drain(queue, store, 2);
 
     expect(settled).toEqual(['ok:completed', 'bad:failed']);
+  });
+
+  it('reports a job that has used up its attempts, before the UI refreshes', async () => {
+    const store = new FakeStore([job({ id: 'bad', entryId: 'entry-9' })]);
+    store.failOutcome = 'exhausted';
+    const events: string[] = [];
+    const queue = new ProcessingQueue(store, {
+      sleep: instantSleep,
+      onJobExhausted: async (j, error) => {
+        await instantSleep();
+        events.push(`exhausted:${j.entryId}:${error}`);
+      },
+      onJobSettled: (j, outcome) => events.push(`settled:${j.id}:${outcome}`),
+    });
+    queue.register('transcribe', async () => {
+      throw new Error('BOOM');
+    });
+
+    await drain(queue, store, 1);
+
+    // Order matters: the entry must be marked failed before lists refetch.
+    expect(events).toEqual(['exhausted:entry-9:BOOM', 'settled:bad:failed']);
+  });
+
+  it('does not report a failure that will be retried', async () => {
+    const store = new FakeStore([job()]);
+    const onJobExhausted = jest.fn();
+    const queue = new ProcessingQueue(store, { sleep: instantSleep, onJobExhausted });
+    queue.register('transcribe', async () => {
+      throw new Error('BOOM');
+    });
+
+    await drain(queue, store, 1);
+
+    expect(onJobExhausted).not.toHaveBeenCalled();
+  });
+
+  it('keeps working when the exhausted hook throws', async () => {
+    const store = new FakeStore([job({ id: 'bad' }), job({ id: 'ok' })]);
+    store.failOutcome = 'exhausted';
+    const queue = new ProcessingQueue(store, {
+      sleep: instantSleep,
+      onJobExhausted: () => {
+        throw new Error('DB_LOCKED');
+      },
+    });
+    queue.register('transcribe', async (j) => {
+      if (j.id === 'bad') throw new Error('BOOM');
+    });
+
+    await drain(queue, store, 2);
+
+    expect(store.completed).toEqual(['ok']);
   });
 
   it('is idempotent on start and reports running state', async () => {

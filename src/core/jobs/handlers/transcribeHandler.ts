@@ -8,6 +8,7 @@
  */
 
 import { isReadable } from '../../../domain/entry/JournalEntry';
+import { cleanTranscript } from '../../../domain/entry/transcript';
 import type { JobHandler } from '../types';
 import { MissingModelError, type HandlerDeps } from './types';
 
@@ -45,13 +46,22 @@ export function createTranscribeHandler({
       'foreground',
     );
 
+    const text = cleanTranscript(result.text);
+
     await entries.saveTranscript(entry.id, {
-      text: result.text,
+      text,
       language: result.language ?? null,
       provenance: { modelId: model.modelId, modelVersion: '1', generatedAt: now() },
     });
 
     await entries.setProcessingState(entry.id, 'transcribing', 'transcribed');
+
+    // Silence: nothing to analyse. Finishing here keeps the language model from
+    // inventing a reflection for an entry with no words in it.
+    if (text === '') {
+      await entries.setProcessingState(entry.id, 'transcribed', 'ready');
+      return;
+    }
 
     // The next step is queued, not called: if analysis fails it retries on its
     // own schedule without re-running transcription.

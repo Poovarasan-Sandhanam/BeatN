@@ -24,6 +24,12 @@ export interface ProcessingQueueOptions {
   sleep?: (ms: number) => Promise<void>;
   /** Called after each job settles — lets the UI refresh without polling the DB. */
   onJobSettled?: (job: ProcessingJob, outcome: 'completed' | 'failed') => void;
+  /**
+   * Called once a job has used up its attempts and will never run again.
+   * Awaited before `onJobSettled`, so the entry is marked failed by the time
+   * the UI refreshes — otherwise it would show "in progress" forever.
+   */
+  onJobExhausted?: (job: ProcessingJob, error: string) => Promise<void> | void;
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -60,9 +66,11 @@ export class ProcessingQueue {
     this.now = options.now ?? Date.now;
     this.sleep = options.sleep ?? defaultSleep;
     this.onJobSettled = options.onJobSettled;
+    this.onJobExhausted = options.onJobExhausted;
   }
 
   private readonly onJobSettled?: ProcessingQueueOptions['onJobSettled'];
+  private readonly onJobExhausted?: ProcessingQueueOptions['onJobExhausted'];
 
   register(type: JobType, handler: JobHandler): void {
     this.handlers.set(type, handler);
@@ -128,8 +136,7 @@ export class ProcessingQueue {
     if (!handler) {
       // An unknown type will never succeed, so burn its attempts rather than
       // spinning on it forever.
-      await this.store.fail(job.id, `NO_HANDLER_FOR_JOB_TYPE:${job.type}`, this.now());
-      this.onJobSettled?.(job, 'failed');
+      await this.recordFailure(job, `NO_HANDLER_FOR_JOB_TYPE:${job.type}`);
       return;
     }
 
@@ -146,11 +153,22 @@ export class ProcessingQueue {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       // Error *codes* only — a handler must never put content in a message.
-      await this.store.fail(job.id, message, this.now());
-      this.onJobSettled?.(job, 'failed');
+      await this.recordFailure(job, message);
     } finally {
       clearInterval(beat);
     }
+  }
+
+  private async recordFailure(job: ProcessingJob, error: string): Promise<void> {
+    const outcome = await this.store.fail(job.id, error, this.now());
+    if (outcome === 'exhausted') {
+      try {
+        await this.onJobExhausted?.(job, error);
+      } catch {
+        // Must not kill the worker. The startup sweep catches anything missed.
+      }
+    }
+    this.onJobSettled?.(job, 'failed');
   }
 
   /** Wait for either a nudge or the poll interval, whichever comes first. */
