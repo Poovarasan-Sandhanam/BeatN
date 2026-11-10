@@ -70,17 +70,22 @@ something fundamental.
 | --- | --- | --- | --- |
 | 3.1 | Catch mistakes automatically (linting) | ✅ done | Found 5 real bugs immediately |
 | 3.2 | Long recordings don't eat memory | ✅ done | A 10-minute entry used to risk a crash |
-| 3.3 | **Lock the journal** — encryption + Face ID | ⬜ | **Anyone holding your unlocked phone can read everything today** |
+| 3.3 | **Lock the journal** — encryption + Face ID | ✅ built | SQLCipher database, key in Keychain/Keystore, Face ID/passcode lock, iOS file protection on recordings |
 | 3.4 | Stop audio files piling up forever | ⬜ | About 1.1 GB a year, nothing deletes it |
-| 3.5 | Verify downloads aren't corrupt | ⬜ | A damaged model currently loads as if fine |
+| 3.5 | Verify downloads aren't corrupt | ✅ built | Exact size + MD5 checked after every download; a damaged file is deleted, never loaded |
 | 3.6 | Pick the right model for weaker phones | ⬜ | Every phone gets the big model today |
 | 3.7 | Actually test the database queries | ⬜ | No test runs real SQL — the riskiest untested code |
 | 3.8 | Crash reports (without leaking content) | ⬜ | You cannot fix what you cannot see |
 
-**3.3 is the one I would not ship without.** The whole product promise is
-privacy, and the journal is currently a plain unencrypted file. It also has to
-be done *before* people have data, because turning encryption on changes the
-file format.
+**3.3 is done** — see SYSTEM_DESIGN.md §10 for how. An existing plaintext
+journal is converted to encrypted automatically on first launch.
+
+**Also fixed before release:** entries no longer spin forever when analysis
+fails (they show "Needs attention" with Try again); silent recordings no longer
+show `[BLANK_AUDIO]`; the language model falls back to the CPU if the GPU path
+fails; raw error text is hidden in release builds; background-audio modes and
+Android foreground-service permissions removed (recording saves itself if the
+app is backgrounded); sqlite-vec disabled (unused, and not 16 KB-page aligned).
 
 **3.4 needs a decision from you:** keep audio forever so entries can be played
 back, or delete it after some time?

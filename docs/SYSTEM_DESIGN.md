@@ -173,8 +173,8 @@ via config plugin flags, so there is no second datastore to keep consistent.
 ```json
 ["expo-sqlite", {
   "enableFTS": true,
-  "withSQLiteVecExtension": true,
-  "useSQLCipher": false
+  "withSQLiteVecExtension": false,
+  "useSQLCipher": true
 }]
 ```
 
@@ -191,8 +191,15 @@ via config plugin flags, so there is no second datastore to keep consistent.
 > build. Re-check this before building semantic search, and expect to need
 > `op-sqlite` or a hand-vendored framework for iOS vector search.
 >
-> `useSQLCipher` is off until Phase 9 — it changes the on-disk format, so it
-> needs key management in place first.
+> **sqlite-vec is now off** (2026-10-29): nothing uses it yet, and its
+> prebuilt Android `vec.so` is 4 KB-page aligned, which Google Play rejects for
+> apps targeting Android 15+. Re-enable only with a 16 KB-aligned build.
+>
+> **`useSQLCipher` is on** (2026-10-29). See §10 for key management. The key is
+> applied with `PRAGMA key` as the first statement on the connection
+> (`src/core/db/encryption.ts`); a plaintext database from an older build is
+> converted once with `sqlcipher_export`, carrying `user_version` across by hand
+> because the export does not copy it.
 
 ### Schema shape
 
@@ -426,11 +433,29 @@ Budgets (**targets to validate on hardware, not claims** — see BENCHMARKS.md):
 
 | Adversary | Mitigation |
 | --- | --- |
-| Lost/stolen device | SQLCipher at rest; key in Keychain/Keystore behind biometrics |
+| Lost/stolen device | SQLCipher at rest; key in Keychain/Keystore; Face ID/passcode app lock; iOS `NSFileProtectionComplete` for every file, recordings included |
 | BeatN's own backend | E2EE — server stores ciphertext it cannot read (§11) |
 | Network observer | TLS; no private content in URLs or query params |
 | Our own telemetry | Event names + numbers only; content is structurally excluded |
 | A future careless `console.log` | Lint rule + typed logger that accepts no free text |
+
+### At rest, as built
+
+- **Database:** SQLCipher with a random 256-bit raw key, created on first launch
+  and stored with expo-secure-store at the default `WHEN_UNLOCKED`
+  accessibility — deliberately *not* `THIS_DEVICE_ONLY`, so the key travels with
+  an encrypted backup and a phone upgrade does not lose the journal.
+- **A database the key cannot open** (e.g. restored from an unencrypted backup)
+  is set aside as `beatn.db.unreadable-<time>` and a fresh journal started —
+  never deleted, so it can be recovered if the key reappears.
+- **Files:** iOS default data protection is `NSFileProtectionComplete`, so
+  recordings and models are unreadable while the phone is locked. Android
+  relies on app sandboxing and file-based encryption; `allowBackup` is off,
+  because Auto Backup would restore the database without its Keystore key.
+- **App lock:** Face ID / Touch ID / device passcode at launch and after 30 s
+  in the background; an opaque cover whenever the app is not active keeps the
+  app-switcher snapshot blank. No lock on a device with no passcode — there is
+  nothing to check against.
 
 ### Non-negotiables
 
