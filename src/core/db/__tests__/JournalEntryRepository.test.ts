@@ -59,6 +59,7 @@ const entry: JournalEntry = {
   mood: null,
   topics: [],
   entities: [],
+  voice: null,
   processingState: 'recorded',
   processingError: null,
   isFavourite: false,

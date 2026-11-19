@@ -102,3 +102,18 @@ describe('buildAnalysisPrompt', () => {
     expect(buildAnalysisPrompt('x')).toContain('Do not diagnose');
   });
 });
+
+describe('buildAnalysisPrompt with voice', () => {
+  it('adds how they sounded, and how to weigh it', () => {
+    const prompt = buildAnalysisPrompt('I am fine.', 'quieter than usual. Overall vocal energy: low.');
+    expect(prompt).toContain('How they sounded: quieter than usual');
+    expect(prompt).toContain('Use the words to judge whether the feeling is positive or negative.');
+    expect(prompt).toContain('Never mention the voice measurements');
+    // The entry itself still comes last, after every instruction.
+    expect(prompt.indexOf('How they sounded')).toBeLessThan(prompt.indexOf('I am fine.'));
+  });
+
+  it('is unchanged in shape without a voice', () => {
+    expect(buildAnalysisPrompt('x')).not.toContain('How they sounded');
+  });
+});

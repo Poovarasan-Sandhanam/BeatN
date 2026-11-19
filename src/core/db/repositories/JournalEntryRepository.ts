@@ -15,8 +15,10 @@ import type {
   Transcript,
 } from '../../../domain/entry/JournalEntry';
 import { assertTransition } from '../../../domain/entry/JournalEntry';
+import type { VoiceFeatures } from '../../../domain/voice/voiceFeatures';
 import {
   entryToRow,
+  parseVoice,
   rowToEntity,
   rowToEntry,
   rowToTopic,
@@ -34,6 +36,7 @@ const ENTRY_COLUMNS = `
   title, summary, reflection_model_id, reflection_model_version, reflection_prompt_version,
   reflection_generated_at,
   mood, mood_confidence, mood_model_id, mood_model_version, mood_generated_at,
+  voice_json,
   processing_state, processing_error, is_favourite, version, device_id
 `;
 
@@ -210,6 +213,28 @@ export class JournalEntryRepository {
        WHERE id = ? AND deleted_at IS NULL`,
       [timestamp, timestamp, id],
     );
+  }
+
+  async saveVoice(id: string, voice: VoiceFeatures): Promise<void> {
+    await this.db.runAsync(
+      `UPDATE journal_entries SET voice_json = ?, updated_at = ?, version = version + 1
+        WHERE id = ? AND deleted_at IS NULL`,
+      [JSON.stringify(voice), this.now(), id],
+    );
+  }
+
+  /**
+   * Voice measurements from the person's most recent other entries — the
+   * baseline a new entry is compared against. Newest first.
+   */
+  async recentVoices(excludeId: string, limit = 20): Promise<VoiceFeatures[]> {
+    const rows = await this.db.getAllAsync<{ voice_json: string | null }>(
+      `SELECT voice_json FROM journal_entries
+        WHERE deleted_at IS NULL AND voice_json IS NOT NULL AND id != ?
+        ORDER BY created_at DESC LIMIT ?`,
+      [excludeId, limit],
+    );
+    return rows.map((row) => parseVoice(row.voice_json)).filter((v): v is VoiceFeatures => v !== null);
   }
 
   /**

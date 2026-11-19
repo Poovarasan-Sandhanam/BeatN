@@ -7,6 +7,7 @@
  */
 
 import type { JournalEntry } from '../domain/entry/JournalEntry';
+import { describeVoice, type VoiceReading } from '../domain/voice/voiceCues';
 import { uuidv7, type RandomSource } from '../domain/ids';
 import type { JournalEntryRepository } from '../core/db/repositories/JournalEntryRepository';
 import type { ProcessingJobRepository } from '../core/db/repositories/ProcessingJobRepository';
@@ -64,6 +65,7 @@ export class JournalService {
       mood: null,
       topics: [],
       entities: [],
+      voice: null,
       processingState: 'recorded',
       processingError: null,
       isFavourite: false,
@@ -86,6 +88,12 @@ export class JournalService {
 
   findById(id: string): Promise<JournalEntry | null> {
     return this.deps.entries.findById(id);
+  }
+
+  /** How the entry sounded, judged against the person's own recent entries. */
+  async voiceReading(entry: JournalEntry): Promise<VoiceReading | null> {
+    if (!entry.voice) return null;
+    return describeVoice(entry.voice, await this.deps.entries.recentVoices(entry.id));
   }
 
   async setFavourite(id: string, isFavourite: boolean): Promise<void> {

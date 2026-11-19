@@ -19,6 +19,7 @@ import {
   type Provenance,
   type ScoredTopic,
 } from '../../domain/entry/JournalEntry';
+import type { VoiceFeatures } from '../../domain/voice/voiceFeatures';
 import { RowMappingError } from './types';
 
 const TABLE = 'journal_entries';
@@ -54,6 +55,8 @@ export interface JournalEntryRow {
   mood_model_id: string | null;
   mood_model_version: string | null;
   mood_generated_at: number | null;
+
+  voice_json: string | null;
 
   processing_state: string;
   processing_error: string | null;
@@ -175,6 +178,7 @@ export function rowToEntry(
 
     topics,
     entities,
+    voice: parseVoice(row.voice_json),
 
     processingState: parseProcessingState(row.processing_state),
     processingError: row.processing_error,
@@ -218,6 +222,8 @@ export function entryToRow(entry: JournalEntry): JournalEntryRow {
     mood_model_version: entry.mood?.provenance.modelVersion ?? null,
     mood_generated_at: entry.mood?.provenance.generatedAt ?? null,
 
+    voice_json: entry.voice ? JSON.stringify(entry.voice) : null,
+
     processing_state: entry.processingState,
     processing_error: entry.processingError,
 
@@ -237,3 +243,21 @@ export const rowToEntity = (row: EntityRow): MentionedEntity => ({
   name: row.name,
   confidence: row.confidence,
 });
+
+/**
+ * Voice features are derived data, recomputable from the audio. A row that
+ * does not parse, or was written by a different definition, is treated as
+ * absent rather than failing the whole entry.
+ */
+export function parseVoice(json: string | null): VoiceFeatures | null {
+  if (json === null) return null;
+  try {
+    const value = JSON.parse(json) as Partial<VoiceFeatures> | null;
+    if (!value || value.version !== 1) return null;
+    const numbers = ['analysedSeconds', 'voicedRatio', 'loudnessDb', 'pauseRatio', 'speechSpanRatio'] as const;
+    if (!numbers.every((key) => typeof value[key] === 'number' && Number.isFinite(value[key]))) return null;
+    return value as VoiceFeatures;
+  } catch {
+    return null;
+  }
+}
