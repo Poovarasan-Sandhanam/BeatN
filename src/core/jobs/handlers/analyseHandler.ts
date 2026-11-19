@@ -12,6 +12,8 @@ import {
   validateEntryAnalysis,
 } from '../../ai/analysis';
 import { cleanTranscript } from '../../../domain/entry/transcript';
+import { describeVoice, voiceSummaryForPrompt } from '../../../domain/voice/voiceCues';
+import { countWords, withSpeakingRate } from '../../../domain/voice/voiceFeatures';
 import type { JobHandler } from '../types';
 import { MissingModelError, type HandlerDeps } from './types';
 
@@ -19,6 +21,7 @@ export function createAnalyseHandler({
   entries,
   runtime,
   resolveModel,
+  analyseVoice,
   now = Date.now,
 }: HandlerDeps): JobHandler {
   return async (job) => {
@@ -57,11 +60,26 @@ export function createAnalyseHandler({
       await entries.setProcessingState(entry.id, entry.processingState, 'analysing');
     }
 
+    // How they sounded. Measured here rather than at transcription so a retry,
+    // or an entry recorded before this existed, gets it too. Best effort: a
+    // missing voice leaves the mood to the words, never fails the entry.
+    let voice = entry.voice;
+    if (!voice && entry.audio.uri && analyseVoice) {
+      const measured = await analyseVoice(entry.audio.uri).catch(() => null);
+      if (measured) {
+        voice = withSpeakingRate(measured, countWords(transcript), entry.audio.durationMs);
+        await entries.saveVoice(entry.id, voice);
+      }
+    }
+    const voiceSummary = voice
+      ? voiceSummaryForPrompt(describeVoice(voice, await entries.recentVoices(entry.id)))
+      : null;
+
     const structured = await runtime.useLlm(
       model,
       (engine) =>
         engine.generateStructured(
-          buildAnalysisPrompt(transcript),
+          buildAnalysisPrompt(transcript, voiceSummary),
           entryAnalysisJsonSchema,
           validateEntryAnalysis,
           { maxTokens: 300 },
@@ -72,7 +90,7 @@ export function createAnalyseHandler({
     const provenance = {
       modelId: model.modelId,
       modelVersion: '1',
-      promptVersion: 'analysis-v1',
+      promptVersion: voiceSummary ? 'analysis-v2-voice' : 'analysis-v2',
       generatedAt: now(),
     };
 

@@ -37,6 +37,7 @@ const bareRow: JournalEntryRow = {
   mood_model_id: null,
   mood_model_version: null,
   mood_generated_at: null,
+  voice_json: null,
   processing_state: 'recorded',
   processing_error: null,
   is_favourite: 0,

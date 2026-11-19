@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Animated, Pressable, ScrollView, StyleSheet, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { JournalEntry } from '../../domain/entry/JournalEntry';
+import type { VoiceReading } from '../../domain/voice/voiceCues';
 import { useServices } from '../../services/ServiceProvider';
 import { formatDuration } from '../../shared/format';
 import { useTheme } from '../../shared/theme';
@@ -29,6 +30,7 @@ export default function EntryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [entry, setEntry] = useState<JournalEntry | null | undefined>(undefined);
+  const [voice, setVoice] = useState<VoiceReading | null>(null);
   // Set the moment the user confirms a delete. The screen is already on its
   // way out; reloading now would flash "This entry is gone" mid-animation.
   const [deleting, setDeleting] = useState(false);
@@ -38,7 +40,10 @@ export default function EntryDetailScreen() {
     async (isCancelled: () => boolean = () => false) => {
       if (!services || !id || deleting) return;
       const next = await services.journal.findById(id);
-      if (!isCancelled()) setEntry(next);
+      const reading = next ? await services.journal.voiceReading(next) : null;
+      if (isCancelled()) return;
+      setEntry(next);
+      setVoice(reading);
     },
     [services, id, deleting],
   );
@@ -198,6 +203,12 @@ export default function EntryDetailScreen() {
           </FadeIn>
         )}
 
+        {voice && (
+          <FadeIn delay={160}>
+            <VoiceCard reading={voice} />
+          </FadeIn>
+        )}
+
         {entry.transcript && (
           <FadeIn delay={180} style={{ gap: theme.spacing.md }}>
             <Text variant="label" tone="muted">
@@ -219,6 +230,61 @@ export default function EntryDetailScreen() {
     </View>
   );
 }
+
+const ENERGY_LABEL: Record<VoiceReading['energy'], string> = {
+  low: 'Low energy',
+  typical: 'Steady energy',
+  high: 'High energy',
+};
+
+/** What the voice said that the words might not have. */
+function VoiceCard({ reading }: { reading: VoiceReading }) {
+  const theme = useTheme();
+  const meter = { low: 1, typical: 2, high: 3 }[reading.energy];
+
+  return (
+    <Card title="How you sounded" variant="flat">
+      <View style={styles.voiceHead}>
+        <View
+          style={styles.meter}
+          accessible
+          accessibilityLabel={ENERGY_LABEL[reading.energy]}>
+          {[1, 2, 3].map((level) => (
+            <View
+              key={level}
+              style={[
+                styles.meterBar,
+                {
+                  height: 6 + level * 5,
+                  backgroundColor: level <= meter ? theme.colors.accent : theme.colors.surfaceSunken,
+                },
+              ]}
+            />
+          ))}
+        </View>
+        <Text variant="bodyStrong">{ENERGY_LABEL[reading.energy]}</Text>
+      </View>
+      {reading.cues.length > 0 ? (
+        <View style={styles.chips}>
+          {reading.cues.map((cue) => (
+            <Chip key={cue.trait} label={capitalise(cue.label)} />
+          ))}
+        </View>
+      ) : (
+        <Text variant="body" tone="muted">
+          {reading.personal ? 'You sounded like your usual self.' : 'Nothing stood out in your voice.'}
+        </Text>
+      )}
+      <Text variant="caption" tone="faint">
+        {reading.personal
+          ? 'Compared with your usual voice, measured on this phone.'
+          : 'Compared with typical speech. BeatN learns your usual voice after a few entries.'}
+      </Text>
+    </Card>
+  );
+}
+
+const capitalise = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 function Stepper({ current }: { current: 0 | 1 | 2 | 3 }) {
   const theme = useTheme();
@@ -340,6 +406,9 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   busyRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  voiceHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  meter: { flexDirection: 'row', alignItems: 'flex-end', gap: 3 },
+  meterBar: { width: 5, borderRadius: 2 },
   stepper: { flexDirection: 'row', gap: 8 },
   step: { flex: 1 },
   stepBar: { height: 4, borderRadius: 2 },

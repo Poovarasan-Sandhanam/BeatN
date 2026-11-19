@@ -5,6 +5,8 @@
  * without a device, which is the point of keeping the layer pure.
  */
 
+import type { VoiceFeatures } from '../voice/voiceFeatures';
+
 /** Which model produced a derived field. Required for every AI-derived value. */
 export interface Provenance {
   modelId: string;
@@ -159,6 +161,8 @@ export interface JournalEntry {
   mood: MoodAssessment | null;
   topics: ScoredTopic[];
   entities: MentionedEntity[];
+  /** How the person sounded — measured from the audio, not the words. */
+  voice: VoiceFeatures | null;
 
   processingState: ProcessingState;
   processingError: string | null;

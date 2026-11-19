@@ -4,6 +4,7 @@ import { modelRuntime, type ModelRef } from '../core/ai/ModelRuntime';
 import { getOrCreateDeviceId, openDatabase } from '../core/db/connection';
 import { JournalEntryRepository } from '../core/db/repositories/JournalEntryRepository';
 import { ProcessingJobRepository } from '../core/db/repositories/ProcessingJobRepository';
+import { analyseVoice } from '../core/audio/voiceAnalysis';
 import { ProcessingQueue } from '../core/jobs/ProcessingQueue';
 import { createAnalyseHandler } from '../core/jobs/handlers/analyseHandler';
 import { createTranscribeHandler } from '../core/jobs/handlers/transcribeHandler';
@@ -68,7 +69,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
           onJobExhausted: (job, error) => entries.markFailed(job.entryId, error),
         });
 
-        const handlerDeps = { entries, jobs, runtime: modelRuntime, resolveModel };
+        const handlerDeps = { entries, jobs, runtime: modelRuntime, resolveModel, analyseVoice };
         queue.register('transcribe', createTranscribeHandler(handlerDeps));
         queue.register('analyse', createAnalyseHandler(handlerDeps));
 

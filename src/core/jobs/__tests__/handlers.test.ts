@@ -1,4 +1,5 @@
 import type { JournalEntry } from '../../../domain/entry/JournalEntry';
+import type { VoiceFeatures } from '../../../domain/voice/voiceFeatures';
 import { createAnalyseHandler } from '../handlers/analyseHandler';
 import { createTranscribeHandler } from '../handlers/transcribeHandler';
 import type { HandlerDeps } from '../handlers/types';
@@ -38,6 +39,7 @@ const baseEntry: JournalEntry = {
   mood: null,
   topics: [],
   entities: [],
+  voice: null,
   processingState: 'recorded',
   processingError: null,
   isFavourite: false,
@@ -74,6 +76,8 @@ function deps(entry: JournalEntry | null, overrides: Partial<HandlerDeps> = {}) 
     saveAnalysis: jest.fn(async () => {
       saved.analysis += 1;
     }),
+    saveVoice: jest.fn(async () => {}),
+    recentVoices: jest.fn(async (): Promise<VoiceFeatures[]> => []),
   };
 
   const jobs = {
@@ -83,12 +87,18 @@ function deps(entry: JournalEntry | null, overrides: Partial<HandlerDeps> = {}) 
     }),
   };
 
+  const prompts: string[] = [];
   const runtime = {
     useStt: jest.fn(async (_m: unknown, work: (e: unknown) => Promise<unknown>) =>
       work({ transcribe: async () => ({ text: transcript.text, language: 'en' }) }),
     ),
     useLlm: jest.fn(async (_m: unknown, work: (e: unknown) => Promise<unknown>) =>
-      work({ generateStructured: async () => ({ value: analysis }) }),
+      work({
+        generateStructured: async (prompt: string) => {
+          prompts.push(prompt);
+          return { value: analysis };
+        },
+      }),
     ),
   };
 
@@ -108,6 +118,7 @@ function deps(entry: JournalEntry | null, overrides: Partial<HandlerDeps> = {}) 
     saved,
     entries,
     runtime,
+    prompts,
   };
 }
 
@@ -201,5 +212,63 @@ describe('analyseHandler', () => {
     await expect(createAnalyseHandler(h.deps)(analyseJob)).rejects.toThrow('AI_FAILED');
     // The transcript was never touched.
     expect(h.entries.saveTranscript).not.toHaveBeenCalled();
+  });
+});
+
+describe('analyseHandler with voice', () => {
+  const analyseJob = { ...job, type: 'analyse' as const };
+  const measured: VoiceFeatures = {
+    version: 1,
+    analysedSeconds: 20,
+    voicedRatio: 0.7,
+    loudnessDb: -33,
+    loudnessVariationDb: 5,
+    pitchHz: 150,
+    pitchVariationSemitones: 1.4,
+    pauseRatio: 0.4,
+    wordsPerMinute: null,
+    speechSpanRatio: 0.5,
+  };
+  const ready = { ...baseEntry, transcript, processingState: 'transcribed' as const };
+
+  it('measures the voice once, adds speaking pace, and stores it', async () => {
+    const analyseVoice = jest.fn(async () => measured);
+    const h = deps(ready, { analyseVoice });
+    await createAnalyseHandler(h.deps)(analyseJob);
+
+    expect(analyseVoice).toHaveBeenCalledWith('file:///a.wav');
+    const stored = (h.entries.saveVoice.mock.calls[0] as unknown[])[1] as VoiceFeatures;
+    expect(stored.wordsPerMinute).not.toBeNull();
+  });
+
+  it('tells the model how they sounded, and to weigh it against the words', async () => {
+    const h = deps(ready, { analyseVoice: async () => measured });
+    await createAnalyseHandler(h.deps)(analyseJob);
+
+    expect(h.prompts[0]).toContain('How they sounded:');
+    expect(h.prompts[0]).toContain('flatter, more monotone than typical');
+    expect(h.prompts[0]).toContain('trust the words');
+  });
+
+  it('reuses a voice already measured instead of reading the audio again', async () => {
+    const analyseVoice = jest.fn(async () => measured);
+    const h = deps({ ...ready, voice: { ...measured, wordsPerMinute: 120 } }, { analyseVoice });
+    await createAnalyseHandler(h.deps)(analyseJob);
+
+    expect(analyseVoice).not.toHaveBeenCalled();
+    expect(h.prompts[0]).toContain('How they sounded:');
+  });
+
+  it('still analyses from the words when the voice cannot be measured', async () => {
+    const h = deps(ready, {
+      analyseVoice: async () => {
+        throw new Error('FILE_GONE');
+      },
+    });
+    await createAnalyseHandler(h.deps)(analyseJob);
+
+    expect(h.saved.analysis).toBe(1);
+    expect(h.prompts[0]).not.toContain('How they sounded:');
+    expect(h.transitions).toContain('analysed->ready');
   });
 });

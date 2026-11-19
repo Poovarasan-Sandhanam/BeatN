@@ -18,6 +18,13 @@ export interface Migration {
 
 export const MIGRATIONS: readonly Migration[] = [
   { version: 1, name: 'initial schema', up: SCHEMA_V1 },
+  {
+    version: 2,
+    name: 'voice features',
+    // JSON, not columns per measurement: the set will grow, and it is only
+    // ever read whole. Lives in the encrypted database like everything else.
+    up: 'ALTER TABLE journal_entries ADD COLUMN voice_json TEXT;',
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS.length;

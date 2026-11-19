@@ -52,7 +52,19 @@ export function validateEntryAnalysis(value: unknown): EntryAnalysis {
  * Kept deliberately terse: small quantized models follow short, concrete
  * instructions far more reliably than long ones.
  */
-export function buildAnalysisPrompt(transcript: string): string {
+export function buildAnalysisPrompt(transcript: string, voiceSummary: string | null = null): string {
+  // The voice decides energy, the words decide direction. Acoustic arousal is
+  // well established; reading positive vs negative from tone alone is not.
+  const voice = voiceSummary
+    ? [
+        '',
+        `How they sounded: ${voiceSummary}`,
+        `Use how they sounded to judge energy (tired or calm when low; excited or stressed when high).
+Use the words to judge whether the feeling is positive or negative.
+If the words and the voice disagree, trust the words and lower moodConfidence.
+Never mention the voice measurements in the summary.`,
+      ]
+    : [];
   return [
     'You analyse a personal journal entry. Reply with one JSON object and nothing else.',
     '',
@@ -66,6 +78,7 @@ export function buildAnalysisPrompt(transcript: string): string {
 - topics: at most 4, lowercase single words or short phrases.
 - Use "unknown" for mood if the entry gives no clear signal.
 - Do not diagnose. Describe only what the entry says.`,
+    ...voice,
     '',
     'Journal entry:',
     '"""',
