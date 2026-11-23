@@ -47,7 +47,14 @@ describe('validateEntryAnalysis', () => {
   };
 
   it('accepts a well-formed analysis', () => {
-    expect(validateEntryAnalysis(valid)).toEqual(valid);
+    // No suggestion from the model is fine: it becomes an empty one, never invented.
+    expect(validateEntryAnalysis(valid)).toEqual({ ...valid, suggestion: '' });
+  });
+
+  it('keeps a suggestion, trimmed', () => {
+    expect(validateEntryAnalysis({ ...valid, suggestion: '  Take a short walk. ' }).suggestion).toBe(
+      'Take a short walk.',
+    );
   });
 
   it('accepts an empty topic list', () => {
@@ -58,27 +65,34 @@ describe('validateEntryAnalysis', () => {
     expect(validateEntryAnalysis({ ...valid, mood: 'unknown' }).mood).toBe('unknown');
   });
 
-  it('rejects a mood outside the allowed set', () => {
-    expect(() => validateEntryAnalysis({ ...valid, mood: 'depressed' })).toThrow();
+  it('never stores a mood outside the allowed set — least of all a clinical one', () => {
+    const result = validateEntryAnalysis({ ...valid, mood: 'depressed' });
+    expect(result.mood).toBe('unknown');
+    expect(result.moodConfidence).toBe(0);
   });
 
-  it('rejects a confidence outside 0..1', () => {
-    expect(() => validateEntryAnalysis({ ...valid, moodConfidence: 1.4 })).toThrow();
+  it('keeps a confidence within 0..1', () => {
+    expect(validateEntryAnalysis({ ...valid, moodConfidence: 1.4 }).moodConfidence).toBe(1);
+    expect(validateEntryAnalysis({ ...valid, moodConfidence: -0.2 }).moodConfidence).toBe(0);
   });
 
   it('rejects an empty summary', () => {
     expect(() => validateEntryAnalysis({ ...valid, summary: '' })).toThrow();
   });
 
-  it('rejects more than six topics', () => {
+  it('keeps at most six topics', () => {
     const topics = Array.from({ length: 7 }, (_, i) => ({ name: `t${i}`, confidence: 0.5 }));
-    expect(() => validateEntryAnalysis({ ...valid, topics })).toThrow();
+    expect(validateEntryAnalysis({ ...valid, topics }).topics).toHaveLength(6);
   });
 
-  it('rejects a missing field', () => {
+  it('treats a missing mood as unknown, but a missing summary as a failure', () => {
     const { mood, ...withoutMood } = valid;
     void mood;
-    expect(() => validateEntryAnalysis(withoutMood)).toThrow();
+    expect(validateEntryAnalysis(withoutMood).mood).toBe('unknown');
+
+    const { summary, ...withoutSummary } = valid;
+    void summary;
+    expect(() => validateEntryAnalysis(withoutSummary)).toThrow();
   });
 
   it('rejects a non-object', () => {
@@ -115,5 +129,43 @@ describe('buildAnalysisPrompt with voice', () => {
 
   it('is unchanged in shape without a voice', () => {
     expect(buildAnalysisPrompt('x')).not.toContain('How they sounded');
+  });
+});
+
+describe('validateEntryAnalysis repairs near-misses', () => {
+  const base = { summary: 'You walked.', mood: 'calm', moodConfidence: 0.6, topics: [] };
+
+  it('accepts a mood in any case', () => {
+    expect(validateEntryAnalysis({ ...base, mood: ' Happy ' }).mood).toBe('happy');
+  });
+
+  it('turns an invented mood into "unknown" with no confidence', () => {
+    const result = validateEntryAnalysis({ ...base, mood: 'content', moodConfidence: 0.9 });
+    expect(result).toMatchObject({ mood: 'unknown', moodConfidence: 0 });
+  });
+
+  it('clamps and parses confidences', () => {
+    expect(validateEntryAnalysis({ ...base, moodConfidence: 1.4 }).moodConfidence).toBe(1);
+    expect(validateEntryAnalysis({ ...base, moodConfidence: '0.7' }).moodConfidence).toBe(0.7);
+    expect(validateEntryAnalysis({ ...base, moodConfidence: 'high' }).moodConfidence).toBe(0.5);
+  });
+
+  it('tidies topics: strings allowed, lowercased, empties dropped, at most six', () => {
+    const result = validateEntryAnalysis({
+      ...base,
+      topics: ['Work', { name: ' Sleep ', confidence: 2 }, { name: '' }, null, 'a', 'b', 'c', 'd', 'e'],
+    });
+    expect(result.topics[0]).toEqual({ name: 'work', confidence: 0.5 });
+    expect(result.topics[1]).toEqual({ name: 'sleep', confidence: 1 });
+    expect(result.topics).toHaveLength(6);
+  });
+
+  it('trims an over-long summary instead of failing', () => {
+    expect(validateEntryAnalysis({ ...base, summary: 'x'.repeat(900) }).summary).toHaveLength(600);
+  });
+
+  it('still fails when there is no summary to show', () => {
+    expect(() => validateEntryAnalysis({ ...base, summary: undefined })).toThrow();
+    expect(() => validateEntryAnalysis('just text')).toThrow();
   });
 });

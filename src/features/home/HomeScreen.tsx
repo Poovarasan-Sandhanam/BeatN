@@ -1,9 +1,8 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  LayoutAnimation,
   Pressable,
   RefreshControl,
   SectionList,
@@ -30,23 +29,15 @@ export default function HomeScreen() {
   const [entries, setEntries] = useState<JournalEntry[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // How many entries are on screen, read only from the async loader below so
-  // it can tell an added or removed entry apart from a status update.
-  const shownCount = useRef<number | null>(null);
-  useEffect(() => {
-    shownCount.current = entries?.length ?? null;
-  }, [entries]);
-
   // `isCancelled` lets the effect drop a result that arrived after unmount.
   const load = useCallback(
     async (isCancelled: () => boolean = () => false) => {
       if (!services) return;
       const next = await services.journal.list();
       if (isCancelled()) return;
-      // A new or deleted entry slides the list into place instead of jumping.
-      if (shownCount.current !== null && shownCount.current !== next.length) {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      }
+      // No LayoutAnimation here: on the new architecture it crashed the app
+      // (SIGSEGV in UIManager::animationTick) when a new entry arrived while
+      // the record screen was closing. New cards fade in via FadeIn instead.
       setEntries(next);
     },
     [services],
@@ -137,8 +128,12 @@ export default function HomeScreen() {
         ListHeaderComponent={
           <View style={{ gap: theme.spacing.xl, marginBottom: theme.spacing.sm }}>
             {header}
-            <FadeIn delay={60}>
-              <View style={[styles.stats, { gap: theme.spacing.sm }]}>
+            <FadeIn delay={60} style={{ gap: theme.spacing.sm }}>
+              <PressableScale
+                onPress={() => router.push('/insights')}
+                accessibilityRole="button"
+                accessibilityHint="Opens Insights"
+                style={[styles.stats, { gap: theme.spacing.sm }]}>
                 <StatTile value={insights.streakDays} label="day streak" />
                 <StatTile value={insights.thisWeek} label="this week" />
                 {/* Under a minute in total reads as "<1", not a discouraging zero. */}
@@ -146,7 +141,31 @@ export default function HomeScreen() {
                   value={insights.totalMinutes === 0 && entries.length > 0 ? '<1' : insights.totalMinutes}
                   label={insights.totalMinutes === 1 ? 'minute' : 'minutes'}
                 />
-              </View>
+              </PressableScale>
+              <PressableScale
+                onPress={() => router.push('/insights')}
+                accessibilityRole="button"
+                accessibilityLabel="Your patterns. See how your days and weeks have been."
+                style={[
+                  styles.insightsLink,
+                  {
+                    backgroundColor: theme.colors.accentSoft,
+                    borderRadius: theme.radius.md,
+                    padding: theme.spacing.md,
+                  },
+                ]}>
+                <View style={styles.fill}>
+                  <Text variant="bodyStrong" tone="accent">
+                    Your patterns
+                  </Text>
+                  <Text variant="caption" tone="muted">
+                    How your days, weeks and months have been
+                  </Text>
+                </View>
+                <View style={{ transform: [{ scaleX: -1 }] }}>
+                  <Glyph name="back" color={theme.colors.accent} size={14} />
+                </View>
+              </PressableScale>
             </FadeIn>
           </View>
         }
@@ -238,11 +257,11 @@ function EntryCard({ entry, onPress }: { entry: JournalEntry; onPress: () => voi
       ) : null}
 
       {preview ? (
-        <Text variant={title ? 'body' : 'reading'} tone={title ? 'muted' : 'default'} numberOfLines={3}>
+        <Text variant={title ? 'body' : 'excerpt'} tone={title ? 'muted' : 'default'} numberOfLines={2}>
           {preview}
         </Text>
       ) : (
-        <Text variant="reading" tone="faint">
+        <Text variant="excerpt" tone="faint">
           {isSilent(entry) ? 'No speech picked up' : 'Listening back to what you said…'}
         </Text>
       )}
@@ -411,6 +430,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   stats: { flexDirection: 'row' },
+  insightsLink: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   stat: { flex: 1, borderWidth: StyleSheet.hairlineWidth, gap: 2 },
   busyChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4 },
   // The small indicator is 20pt; scaled to sit on the caption's line height.

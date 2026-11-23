@@ -45,6 +45,7 @@ export interface JournalEntryRow {
 
   title: string | null;
   summary: string | null;
+  suggestion: string | null;
   reflection_model_id: string | null;
   reflection_model_version: string | null;
   reflection_prompt_version: string | null;
@@ -164,7 +165,12 @@ export function rowToEntry(
 
     reflection:
       row.summary !== null && reflectionProvenance !== null
-        ? { title: row.title, summary: row.summary, provenance: reflectionProvenance }
+        ? {
+            title: row.title,
+            summary: row.summary,
+            suggestion: row.suggestion || null,
+            provenance: reflectionProvenance,
+          }
         : null,
 
     mood:
@@ -211,6 +217,7 @@ export function entryToRow(entry: JournalEntry): JournalEntryRow {
 
     title: entry.reflection?.title ?? null,
     summary: entry.reflection?.summary ?? null,
+    suggestion: entry.reflection?.suggestion ?? null,
     reflection_model_id: entry.reflection?.provenance.modelId ?? null,
     reflection_model_version: entry.reflection?.provenance.modelVersion ?? null,
     reflection_prompt_version: entry.reflection?.provenance.promptVersion ?? null,

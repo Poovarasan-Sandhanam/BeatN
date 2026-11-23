@@ -28,6 +28,7 @@ function makeService(overrides: Partial<JournalServiceDeps> = {}) {
     list: jest.fn(async () => []),
     findById: jest.fn(async () => null),
     setFavourite: jest.fn(async () => {}),
+    knownRecordingNames: jest.fn(async () => new Set<string>(['known.wav'])),
     softDelete: jest.fn(async () => {
       order.push('softDelete');
     }),
@@ -200,3 +201,38 @@ describe('onChange', () => {
     await expect(h.service.delete('e1')).resolves.toBeUndefined();
   });
 });
+
+describe('recoverUnsavedRecordings', () => {
+  const found = (name: string, createdAt: number) => ({
+    ...recording,
+    uri: `file:///var/mobile/Documents/recordings/${name}`,
+    createdAt,
+  });
+
+  it('adds recordings no entry knows about, dated when they were recorded', async () => {
+    const h = makeService();
+    const added = await h.service.recoverUnsavedRecordings([found('lost.wav', 1_600_000_000_000)]);
+
+    expect(added).toBe(1);
+    expect(h.created).toHaveLength(1);
+    expect(h.created[0]).toMatchObject({ createdAt: 1_600_000_000_000, processingState: 'recorded' });
+    // Queued for transcription like any new entry.
+    expect(h.enqueued).toEqual([expect.objectContaining({ type: 'transcribe' })]);
+  });
+
+  it('never re-adds a recording an entry already has — deleted entries included', async () => {
+    const h = makeService();
+    // The path prefix differs between installs; the file name is what matches.
+    const added = await h.service.recoverUnsavedRecordings([found('known.wav', 1)]);
+
+    expect(added).toBe(0);
+    expect(h.created).toEqual([]);
+  });
+
+  it('does not touch the database when there is nothing to recover', async () => {
+    const h = makeService();
+    expect(await h.service.recoverUnsavedRecordings([])).toBe(0);
+    expect(h.entries.knownRecordingNames).not.toHaveBeenCalled();
+  });
+});
+

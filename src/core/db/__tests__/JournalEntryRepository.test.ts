@@ -1,5 +1,5 @@
 import type { JournalEntry } from '../../../domain/entry/JournalEntry';
-import { JournalEntryRepository } from '../repositories/JournalEntryRepository';
+import { JournalEntryRepository, fileName } from '../repositories/JournalEntryRepository';
 import type { Database, SqlRunResult, SqlValue } from '../types';
 
 interface Executed {
@@ -138,7 +138,7 @@ describe('saveAnalysis', () => {
   const run = async (db: RecordingDatabase) =>
     new JournalEntryRepository(db, () => 9_000).saveAnalysis(
       'entry-1',
-      { title: 'T', summary: 'S', provenance: { ...provenance, promptVersion: 'v1' } },
+      { title: 'T', summary: 'S', suggestion: null, provenance: { ...provenance, promptVersion: 'v1' } },
       { value: 'reflective', confidence: 0.7, provenance },
       [
         { name: 'career', confidence: 0.9 },
@@ -265,5 +265,20 @@ describe('failOrphaned', () => {
     expect(sql).toContain("processing_state NOT IN ('ready', 'failed')");
     expect(sql).toContain('deleted_at IS NULL');
     expect(params).toEqual(['PROCESSING_INTERRUPTED', 6_000]);
+  });
+});
+
+describe('knownRecordingNames', () => {
+  it('includes deleted entries, so their audio is never recovered as new', async () => {
+    const db = new RecordingDatabase();
+    await new JournalEntryRepository(db).knownRecordingNames();
+    expect(db.queries[0].sql).toContain('audio_uri IS NOT NULL');
+    expect(db.queries[0].sql).not.toContain('deleted_at');
+  });
+});
+
+describe('fileName', () => {
+  it('takes the last path segment of a file URI', () => {
+    expect(fileName('file:///var/mobile/Containers/Data/x/Documents/recordings/17.wav')).toBe('17.wav');
   });
 });

@@ -1,4 +1,4 @@
-import { Directory, File, FileMode, Paths } from 'expo-file-system';
+import { File, FileMode } from 'expo-file-system';
 import {
   requestRecordingPermissionsAsync,
   useAudioStream,
@@ -6,8 +6,12 @@ import {
 } from 'expo-audio';
 import { useCallback, useRef, useState } from 'react';
 
+import { LevelHistogram, MIN_USEFUL_GAIN, meterLevel, normalisationGain } from './loudness';
+import { normaliseRecording } from './normaliseRecording';
 import { WHISPER_CHANNELS, WHISPER_SAMPLE_RATE, peakAmplitude, toWhisperPcm } from './pcm';
+import { RECORDINGS_DIRNAME, recordingsDirectory } from './recordingsFolder';
 import { WavFileWriter } from './WavFileWriter';
+import { prepareForPlayback, prepareForRecording } from './audioSession';
 
 export interface WavRecording {
   /** file:// path to a 16 kHz mono 16-bit PCM WAV. */
@@ -19,15 +23,8 @@ export interface WavRecording {
   capturedChannels: number;
 }
 
-export type RecorderState = 'idle' | 'recording' | 'finalising';
+export type RecorderState = 'idle' | 'recording' | 'paused' | 'finalising';
 
-const RECORDINGS_DIRNAME = 'recordings';
-
-function recordingsDirectory(): Directory {
-  const directory = new Directory(Paths.document, RECORDINGS_DIRNAME);
-  if (!directory.exists) directory.create({ intermediates: true });
-  return directory;
-}
 
 /**
  * Captures microphone audio as raw PCM and finalises it to a WAV file.
@@ -36,7 +33,16 @@ function recordingsDirectory(): Directory {
  * which whisper.rn cannot decode, so this goes through the PCM stream instead.
  * That also gives us live sample levels for the waveform.
  */
-export function useWavRecorder() {
+export interface WavRecorderOptions {
+  /**
+   * Folder under Documents. Journal recordings use the default; anything else
+   * (developer benchmarks) must use its own, or launch-time recovery would
+   * turn it into journal entries.
+   */
+  directoryName?: string;
+}
+
+export function useWavRecorder({ directoryName = RECORDINGS_DIRNAME }: WavRecorderOptions = {}) {
   const [state, setState] = useState<RecorderState>('idle');
   const [durationMs, setDurationMs] = useState(0);
   const [level, setLevel] = useState(0);
@@ -46,6 +52,9 @@ export function useWavRecorder() {
   const writerRef = useRef<WavFileWriter | null>(null);
   const fileRef = useRef<File | null>(null);
   const frameCountRef = useRef(0);
+  // How loud this recording gets, tracked as it is written, so the gain is
+  // known at stop without reading the whole file back.
+  const levelsRef = useRef<LevelHistogram | null>(null);
   const formatRef = useRef({ sampleRate: WHISPER_SAMPLE_RATE, channels: WHISPER_CHANNELS });
 
   const onBuffer = useCallback((buffer: AudioStreamBuffer) => {
@@ -61,7 +70,9 @@ export function useWavRecorder() {
     writerRef.current?.append(normalised);
     frameCountRef.current += normalised.length;
 
-    setLevel(peakAmplitude(normalised));
+    levelsRef.current?.add(normalised);
+    // Decibel scale: raw speech sits around -50 dBFS and would barely move a linear meter.
+    setLevel(meterLevel(peakAmplitude(normalised)));
     setDurationMs(Math.round((frameCountRef.current / WHISPER_SAMPLE_RATE) * 1000));
   }, []);
 
@@ -79,12 +90,13 @@ export function useWavRecorder() {
     }
 
     frameCountRef.current = 0;
+    levelsRef.current = new LevelHistogram();
     setDurationMs(0);
     setLevel(0);
 
     // The file is created now, not at stop: samples are written as they
     // arrive, so there has to be somewhere to put them.
-    const file = new File(recordingsDirectory(), `${Date.now()}.wav`);
+    const file = new File(recordingsDirectory(directoryName), `${Date.now()}.wav`);
     file.create({ overwrite: true });
     const writer = new WavFileWriter(
       file.open(FileMode.ReadWrite),
@@ -96,6 +108,7 @@ export function useWavRecorder() {
     writerRef.current = writer;
 
     try {
+      await prepareForRecording();
       await stream.start();
     } catch (error) {
       // Do not leave a stray zero-length file behind.
@@ -107,11 +120,38 @@ export function useWavRecorder() {
     }
 
     setState('recording');
+  }, [stream, directoryName]);
+
+  /**
+   * Stops listening but keeps the recording open. The file is checkpointed,
+   * so if the app is killed while paused what was said survives as a valid
+   * recording (see `recoverUnsavedRecordings`).
+   */
+  const pause = useCallback(() => {
+    if (!writerRef.current) return;
+    stream.stop();
+    try {
+      writerRef.current.checkpoint();
+    } catch {
+      // The OS may have locked the file already; resume or stop will retry.
+    }
+    setLevel(0);
+    setState('paused');
+  }, [stream]);
+
+  /** Starts listening again, appending to the same recording. */
+  const resume = useCallback(async () => {
+    if (!writerRef.current) return;
+    await prepareForRecording();
+    await stream.start();
+    setState('recording');
   }, [stream]);
 
   const stop = useCallback(async (): Promise<WavRecording> => {
     setState('finalising');
     stream.stop();
+    // Hand the session back for listening, or playback lands on the earpiece.
+    void prepareForPlayback();
     setLevel(0);
 
     const writer = writerRef.current;
@@ -132,6 +172,14 @@ export function useWavRecorder() {
 
       const { byteLength, durationMs: recordedMs } = writer.finish();
 
+      // Bring quiet raw-mic audio up to a normal listening level — for
+      // playback, for transcription, and for voice analysis. Best effort:
+      // a recording that cannot be boosted is still a recording.
+      const gain = levelsRef.current ? normalisationGain(levelsRef.current) : 1;
+      if (gain >= MIN_USEFUL_GAIN) {
+        await normaliseRecording(file, gain).catch(() => {});
+      }
+
       return {
         uri: file.uri,
         durationMs: recordedMs,
@@ -147,6 +195,7 @@ export function useWavRecorder() {
 
   const cancel = useCallback(() => {
     stream.stop();
+    void prepareForPlayback();
 
     // A cancelled recording leaves a file with a placeholder header, so it is
     // deleted rather than left for the orphan reaper to find.
@@ -165,5 +214,5 @@ export function useWavRecorder() {
     setState('idle');
   }, [stream]);
 
-  return { state, durationMs, level, start, stop, cancel };
+  return { state, durationMs, level, start, pause, resume, stop, cancel };
 }

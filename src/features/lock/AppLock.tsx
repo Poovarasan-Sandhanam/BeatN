@@ -12,6 +12,14 @@ type LockState = 'checking' | 'locked' | 'unlocked' | 'disabled';
 /**
  * Keeps the journal behind Face ID / Touch ID / the device passcode.
  *
+ * Opening is splash → Face ID → journal, with nothing in between: the journal
+ * (and its database) mounts only after the first unlock, so Face ID is asked
+ * for while the app has nothing else to do — opening the encrypted database
+ * on the same thread used to hold the prompt back by a second or two. While
+ * the prompt is up only the BeatN mark shows, matching the launch screen; the
+ * "locked" message and Unlock button appear only if Face ID is cancelled or
+ * fails.
+ *
  * The app stays mounted underneath — navigation, a recording in progress and
  * the processing queue all carry on — and an opaque layer covers it. Two
  * layers, for two different threats:
@@ -23,12 +31,16 @@ export function AppLock({ children }: { children: ReactNode }) {
   const [lock, setLock] = useState<LockState>('checking');
   const [active, setActive] = useState(AppState.currentState === 'active');
   const [prompting, setPrompting] = useState(false);
+  // True from the first unlock on. Re-locking covers the journal; it never
+  // unmounts it, so a recording or a running analysis carries on.
+  const [opened, setOpened] = useState(false);
   const leftAt = useRef<number | null>(null);
   // Mirrors `lock` for the AppState listener, which outlives any one render.
   const lockRef = useRef<LockState>('checking');
   useEffect(() => {
     lockRef.current = lock;
   }, [lock]);
+  if (!opened && (lock === 'unlocked' || lock === 'disabled')) setOpened(true);
 
   const unlock = useCallback(async () => {
     setPrompting(true);
@@ -76,19 +88,20 @@ export function AppLock({ children }: { children: ReactNode }) {
 
   return (
     <View style={styles.fill}>
-      {children}
-      {showLock && <LockScreen checking={lock === 'checking'} prompting={prompting} onUnlock={unlock} />}
+      {opened && children}
+      {showLock && <LockScreen showControls={lock === 'locked' && !prompting} prompting={prompting} onUnlock={unlock} />}
       {showCover && <PrivacyCover />}
     </View>
   );
 }
 
 function LockScreen({
-  checking,
+  showControls,
   prompting,
   onUnlock,
 }: {
-  checking: boolean;
+  /** Off while Face ID is asking: just the mark, exactly like the launch screen. */
+  showControls: boolean;
   prompting: boolean;
   onUnlock: () => void;
 }) {
@@ -109,7 +122,7 @@ function LockScreen({
       accessibilityViewIsModal>
       <View style={[styles.fill, styles.centre, { gap: theme.spacing.lg }]}>
         <Mark />
-        {!checking && (
+        {showControls && (
           <FadeIn style={{ gap: theme.spacing.sm }}>
             <Text variant="title" align="center">
               Your journal is locked
@@ -120,7 +133,7 @@ function LockScreen({
           </FadeIn>
         )}
       </View>
-      {!checking && (
+      {showControls && (
         <FadeIn style={styles.stretch}>
           <Button label="Unlock" icon="lock" size="large" loading={prompting} onPress={onUnlock} />
         </FadeIn>

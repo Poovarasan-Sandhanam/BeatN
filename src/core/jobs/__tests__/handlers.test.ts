@@ -185,7 +185,7 @@ describe('analyseHandler', () => {
       transcript,
       reflection: {
         title: null,
-        summary: 'done',
+        summary: 'done', suggestion: null,
         provenance: { modelId: 'm', modelVersion: '1', generatedAt: 1 },
       },
       processingState: 'ready',

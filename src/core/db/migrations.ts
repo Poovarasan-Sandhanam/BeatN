@@ -25,6 +25,11 @@ export const MIGRATIONS: readonly Migration[] = [
     // ever read whole. Lives in the encrypted database like everything else.
     up: 'ALTER TABLE journal_entries ADD COLUMN voice_json TEXT;',
   },
+  {
+    version: 3,
+    name: 'reflection suggestion',
+    up: 'ALTER TABLE journal_entries ADD COLUMN suggestion TEXT;',
+  },
 ];
 
 export const LATEST_VERSION = MIGRATIONS.length;

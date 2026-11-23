@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { prepareForPlayback } from '../../core/audio/audioSession';
 import type { JournalEntry } from '../../domain/entry/JournalEntry';
+import { toSecondPerson } from '../../domain/entry/secondPerson';
 import type { VoiceReading } from '../../domain/voice/voiceCues';
 import { useServices } from '../../services/ServiceProvider';
 import { formatDuration } from '../../shared/format';
@@ -195,7 +197,7 @@ export default function EntryDetailScreen() {
         {entry.reflection && (
           <FadeIn delay={140}>
             <Card title="Reflection" variant="tinted">
-              <Text variant="reading">{entry.reflection.summary}</Text>
+              <Text variant="reading">{toSecondPerson(entry.reflection.summary)}</Text>
               <Text variant="caption" tone="muted">
                 Written on this phone{mood ? ` · feels ${mood.label.toLowerCase()}, ${((entry.mood?.confidence ?? 0) * 100).toFixed(0)}% sure` : ''}. BeatN is a journal, not a therapist.
               </Text>
@@ -226,8 +228,75 @@ export default function EntryDetailScreen() {
             )}
           </FadeIn>
         )}
+
+        {(mood || voice || entry.reflection?.suggestion) && (
+          <FadeIn delay={220}>
+            <HowYouAre
+              moodLabel={mood?.label ?? null}
+              moodColor={mood?.color ?? null}
+              energy={voice?.energy ?? null}
+              suggestion={entry.reflection?.suggestion ?? null}
+              onSeePatterns={() => router.push('/insights')}
+            />
+          </FadeIn>
+        )}
       </ScrollView>
     </View>
+  );
+}
+
+/**
+ * The end of the entry: one read of how you were — the mood from your words,
+ * the energy from your voice — and one small thing to try today.
+ */
+function HowYouAre({
+  moodLabel,
+  moodColor,
+  energy,
+  suggestion,
+  onSeePatterns,
+}: {
+  moodLabel: string | null;
+  moodColor: string | null;
+  energy: VoiceReading['energy'] | null;
+  suggestion: string | null;
+  onSeePatterns: () => void;
+}) {
+  const theme = useTheme();
+  const energyWords = { low: 'low energy', typical: 'steady energy', high: 'lots of energy' };
+  const read =
+    moodLabel && energy
+      ? `You came across ${moodLabel.toLowerCase()}, with ${energyWords[energy]} in your voice.`
+      : moodLabel
+        ? `You came across ${moodLabel.toLowerCase()}.`
+        : energy
+          ? `Your voice had ${energyWords[energy]}.`
+          : null;
+
+  return (
+    <Card title="How you are" variant="raised">
+      {read && (
+        <View style={styles.voiceHead}>
+          {moodColor && <View style={[styles.moodDot, { backgroundColor: moodColor }]} />}
+          <Text variant="body" style={styles.fill}>
+            {read}
+          </Text>
+        </View>
+      )}
+      {suggestion && (
+        <View style={[styles.tryToday, { backgroundColor: theme.colors.accentSoft, borderRadius: theme.radius.md }]}>
+          <Text variant="label" tone="accent">
+            Try today
+          </Text>
+          <Text variant="body">{suggestion}</Text>
+        </View>
+      )}
+      <PressableScale onPress={onSeePatterns} accessibilityRole="button" hitSlop={8}>
+        <Text variant="captionStrong" tone="accent">
+          See how this fits your week →
+        </Text>
+      </PressableScale>
+    </Card>
   );
 }
 
@@ -327,11 +396,13 @@ function AudioPlayback({ uri, fallbackDurationMs }: { uri: string; fallbackDurat
   const duration = status.duration > 0 ? status.duration : fallbackDurationMs / 1000;
   const fraction = duration > 0 ? Math.min(1, status.currentTime / duration) : 0;
 
-  const toggle = useCallback(() => {
+  const toggle = useCallback(async () => {
     if (status.playing) {
       player.pause();
       return;
     }
+    // Loudspeaker, and audible with the silent switch on — see audioSession.
+    await prepareForPlayback();
     // Restart once playback has reached the end.
     if (status.didJustFinish || fraction >= 1) void player.seekTo(0);
     player.play();
@@ -407,6 +478,8 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   busyRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   voiceHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  moodDot: { width: 10, height: 10, borderRadius: 5 },
+  tryToday: { padding: 12, gap: 4 },
   meter: { flexDirection: 'row', alignItems: 'flex-end', gap: 3 },
   meterBar: { width: 5, borderRadius: 2 },
   stepper: { flexDirection: 'row', gap: 8 },

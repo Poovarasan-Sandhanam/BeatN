@@ -59,7 +59,7 @@ describe('previewOf', () => {
     const result = previewOf(
       entry({
         transcript: { text: 'raw words', language: 'en', provenance: { modelId: 'm', modelVersion: '1', generatedAt: 0 } },
-        reflection: { title: null, summary: 'the summary', provenance: { modelId: 'm', modelVersion: '1', generatedAt: 0 } },
+        reflection: { title: null, summary: 'the summary', suggestion: null, provenance: { modelId: 'm', modelVersion: '1', generatedAt: 0 } },
       }),
     );
     expect(result).toBe('the summary');
@@ -137,7 +137,7 @@ describe('titleOf', () => {
 
   it('prefers the reflection title', () => {
     const e = entry({
-      reflection: { title: '  A long walk ', summary: 's', provenance },
+      reflection: { title: '  A long walk ', summary: 's', suggestion: null, provenance },
       transcript: { text: 'Hello there. More.', language: 'en', provenance },
     });
     expect(titleOf(e)).toBe('A long walk');

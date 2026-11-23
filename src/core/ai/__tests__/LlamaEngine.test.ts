@@ -50,7 +50,7 @@ describe('entryAnalysisJsonSchema', () => {
   it('requires every field the validator requires', () => {
     const schema = entryAnalysisJsonSchema as { required: string[] };
     expect(schema.required.sort()).toEqual(
-      ['mood', 'moodConfidence', 'summary', 'topics'].sort(),
+      ['mood', 'moodConfidence', 'suggestion', 'summary', 'topics'].sort(),
     );
   });
 
@@ -66,7 +66,7 @@ describe('entryAnalysisJsonSchema', () => {
 });
 
 describe('generateStructured', () => {
-  it('constrains the sampler with the schema on the first attempt', async () => {
+  it('never asks the native sampler for a grammar — that path can crash llama.rn', async () => {
     const { engine, calls } = engineReturning(VALID);
 
     const result = await engine.generateStructured(
@@ -76,13 +76,13 @@ describe('generateStructured', () => {
     );
 
     expect(calls).toHaveLength(1);
-    expect(calls[0].options.jsonSchema).toBe(entryAnalysisJsonSchema);
-    expect(result.grammarConstrained).toBe(true);
+    expect(calls[0].options.jsonSchema).toBeUndefined();
+    expect(result.grammarConstrained).toBe(false);
     expect(result.attempts).toBe(1);
     expect(result.value.mood).toBe('reflective');
   });
 
-  it('drops the grammar and goes to temperature 0 on the retry', async () => {
+  it('goes to temperature 0 with a blunter instruction on the retry', async () => {
     const { engine, calls } = engineReturning('not json at all', VALID);
 
     const result = await engine.generateStructured(
@@ -99,15 +99,23 @@ describe('generateStructured', () => {
     expect(result.grammarConstrained).toBe(false);
   });
 
-  it('rejects output that is well-formed but semantically wrong', async () => {
-    // Shape is fine; "ecstatic" is not a permitted mood.
-    const bogus = JSON.stringify({
-      summary: 'x',
-      mood: 'ecstatic',
-      moodConfidence: 0.5,
-      topics: [],
-    });
-    const { engine } = engineReturning(bogus, bogus);
+  it('repairs an invented mood to "unknown" instead of failing the entry', async () => {
+    const invented = JSON.stringify({ summary: 'x', mood: 'ecstatic', moodConfidence: 0.9, topics: [] });
+    const { engine, calls } = engineReturning(invented);
+
+    const result = await engine.generateStructured(
+      'prompt',
+      entryAnalysisJsonSchema,
+      validateEntryAnalysis,
+    );
+    expect(calls).toHaveLength(1);
+    expect(result.value.mood).toBe('unknown');
+    expect(result.value.moodConfidence).toBe(0);
+  });
+
+  it('rejects output with nothing usable in it', async () => {
+    const empty = JSON.stringify({ mood: 'calm', topics: [] });
+    const { engine } = engineReturning(empty, empty);
 
     await expect(
       engine.generateStructured('prompt', entryAnalysisJsonSchema, validateEntryAnalysis),
@@ -133,8 +141,8 @@ describe('generateStructured', () => {
     expect(result.value.summary).toContain('weighing up');
   });
 
-  it('reports grammar support', () => {
-    expect(new LlamaEngine().supportsGrammar).toBe(true);
+  it('reports no grammar support', () => {
+    expect(new LlamaEngine().supportsGrammar).toBe(false);
   });
 });
 
@@ -154,7 +162,8 @@ describe('generateStructured when the native layer throws', () => {
 
     expect(result.attempts).toBe(2);
     expect(result.grammarConstrained).toBe(false);
-    expect(generate.mock.calls[1][1]?.jsonSchema).toBeUndefined();
+    // No reply came back, so the retry repeats the prompt rather than scolding.
+    expect(generate.mock.calls[1][0]).toBe('prompt');
   });
 
   it('gives up with the native error if the unconstrained attempt throws too', async () => {
@@ -221,5 +230,67 @@ describe('GPU fallback', () => {
 
     await expect(engine.generate('hello')).rejects.toThrow('CONTEXT_FULL');
     expect(initLlama).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('one completion per native context (llama.rn double-free workaround)', () => {
+  const initLlama = initLlamaImport as unknown as jest.Mock;
+  let contexts: { completion: jest.Mock; release: jest.Mock }[];
+
+  beforeEach(() => {
+    contexts = [];
+    initLlama.mockReset();
+    initLlama.mockImplementation(async () => {
+      const context = {
+        gpu: false,
+        release: jest.fn(async () => {}),
+        completion: jest.fn(async () => ({ text: VALID, timings: { predicted_n: 1 } })),
+      };
+      contexts.push(context);
+      return context;
+    });
+  });
+
+  it('runs every completion on a context that has never run one before', async () => {
+    const engine = new LlamaEngine({ gpuLayers: 0 });
+    await engine.loadModel('/models/llm.gguf');
+
+    await engine.generate('one');
+    await engine.generate('two');
+    await engine.generate('three');
+
+    expect(contexts).toHaveLength(3);
+    for (const context of contexts) expect(context.completion).toHaveBeenCalledTimes(1);
+    // Each used context is released before the next exists.
+    expect(contexts[0].release).toHaveBeenCalled();
+    expect(contexts[1].release).toHaveBeenCalled();
+  });
+
+  it('never reuses a context whose completion threw', async () => {
+    const engine = new LlamaEngine({ gpuLayers: 0 });
+    await engine.loadModel('/models/llm.gguf');
+    contexts[0].completion.mockRejectedValueOnce(new Error('std::exception'));
+
+    await expect(engine.generate('poisoned')).rejects.toThrow('std::exception');
+    await engine.generate('next');
+
+    expect(contexts[0].completion).toHaveBeenCalledTimes(1);
+    expect(contexts[1].completion).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a structured request on a fresh context after a native error', async () => {
+    const engine = new LlamaEngine({ gpuLayers: 0 });
+    await engine.loadModel('/models/llm.gguf');
+    contexts[0].completion.mockRejectedValueOnce(new Error('std::exception'));
+
+    const result = await engine.generateStructured(
+      'prompt',
+      entryAnalysisJsonSchema,
+      validateEntryAnalysis,
+    );
+
+    expect(result.attempts).toBe(2);
+    expect(contexts).toHaveLength(2);
+    expect(contexts[1].completion).toHaveBeenCalledTimes(1);
   });
 });

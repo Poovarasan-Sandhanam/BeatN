@@ -173,4 +173,55 @@ describe('WavFileWriter', () => {
     expect(view.getUint16(22, true)).toBe(2); // channels
     expect(view.getUint32(24, true)).toBe(48_000); // sample rate
   });
+
+  describe('checkpoint (pause)', () => {
+    it('leaves a valid, complete file of everything so far', () => {
+      const sink = new MemorySink();
+      const writer = new WavFileWriter(sink);
+      writer.start();
+      writer.append(samples(800));
+      writer.checkpoint();
+
+      expect(sink.view().getUint32(40, true)).toBe(1600);
+      expect(sink.view().getUint32(4, true)).toBe(36 + 1600);
+      expect(sink.bytes.length).toBe(WAV_HEADER_BYTES + 1600);
+      expect(sink.closed).toBe(false);
+    });
+
+    it('carries on appending after the audio, not over the header', () => {
+      const sink = new MemorySink();
+      const writer = new WavFileWriter(sink);
+      writer.start();
+      writer.append(samples(100, 1));
+      writer.checkpoint();
+      writer.append(samples(100, 2));
+      const result = writer.finish();
+
+      expect(result.frameCount).toBe(200);
+      expect(sink.bytes.length).toBe(WAV_HEADER_BYTES + 400);
+      // First segment intact, second right after it.
+      expect(sink.view().getInt16(WAV_HEADER_BYTES, true)).toBe(1);
+      expect(sink.view().getInt16(WAV_HEADER_BYTES + 200, true)).toBe(2);
+      expect(sink.view().getUint32(40, true)).toBe(400);
+    });
+
+    it('can be taken several times', () => {
+      const sink = new MemorySink();
+      const writer = new WavFileWriter(sink);
+      writer.start();
+      for (let i = 0; i < 3; i += 1) {
+        writer.append(samples(10));
+        writer.checkpoint();
+      }
+      expect(sink.view().getUint32(40, true)).toBe(60);
+    });
+
+    it('refuses after close', () => {
+      const writer = new WavFileWriter(new MemorySink());
+      writer.start();
+      writer.finish();
+      expect(() => writer.checkpoint()).toThrow('WAV_WRITER_CLOSED');
+    });
+  });
 });
+
