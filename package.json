@@ -54,9 +54,9 @@
     "test:watch": "jest --watch",
     "lint": "npm run clean:appledouble && eslint .",
     "lint:fix": "npm run clean:appledouble && eslint . --fix",
-    "beta:ios": "npx eas-cli@latest build --platform ios --profile beta --auto-submit-with-profile beta",
-    "beta:android": "npx eas-cli@latest build --platform android --profile beta --auto-submit-with-profile beta",
-    "beta:android:closed": "npx eas-cli@latest build --platform android --profile beta --auto-submit-with-profile closed"
+    "beta:ios": "npm run clean:appledouble && npx eas-cli@latest build --platform ios --profile beta --auto-submit-with-profile beta",
+    "beta:android": "npm run clean:appledouble && npx eas-cli@latest build --platform android --profile beta --auto-submit-with-profile beta",
+    "beta:android:closed": "npm run clean:appledouble && npx eas-cli@latest build --platform android --profile beta --auto-submit-with-profile closed"
   },
   "private": true,
   "jest": {
