@@ -75,7 +75,9 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '20.19'
+          # eas-cli 27.11+ requires Node >= 22 (its oclif plugins declare it);
+          # still within the project's own >= 20.19.4.
+          node-version: '22'
           cache: npm
 
       # EAS reads app.json and its config plugins locally before uploading,
