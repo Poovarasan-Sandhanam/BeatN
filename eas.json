@@ -20,10 +20,16 @@
     }
   },
   "submit": {
-    "production": {},
+    "production": {
+      "ios": {
+        "ascAppId": "6838248944",
+        "appleTeamId": "6J75KC7K4S"
+      }
+    },
     "beta": {
       "ios": {
-        "appleTeamId": "6J75KC7K4S"
+        "appleTeamId": "6J75KC7K4S",
+        "ascAppId": "6838248944"
       },
       "android": {
         "track": "internal",
