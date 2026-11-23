@@ -75,9 +75,12 @@ export default function HomeScreen() {
       <Text variant="label" tone="faint">
         {formatLongDate()}
       </Text>
-      {/* Long-press is the way into developer tools: discoverable if you
-          know, invisible if you do not. */}
-      <Pressable onLongPress={() => router.push('/dev')} delayLongPress={800} accessibilityRole="header">
+      {/* Long-press opens developer tools — in development builds only. A
+          release build has no hidden features (App Review guideline 2.3.1). */}
+      <Pressable
+        onLongPress={__DEV__ ? () => router.push('/dev') : undefined}
+        delayLongPress={800}
+        accessibilityRole="header">
         <Text variant="hero">{greetingFor()}</Text>
       </Pressable>
     </View>

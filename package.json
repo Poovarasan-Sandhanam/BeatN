@@ -71,6 +71,9 @@
       "^whisper\\.rn/index$": "<rootDir>/jest/mocks/whisper.rn.js",
       "^llama\\.rn$": "<rootDir>/jest/mocks/llama.rn.js"
     },
-    "watchman": false
+    "watchman": false,
+    "modulePaths": [
+      "<rootDir>/node_modules/expo/node_modules"
+    ]
   }
 }

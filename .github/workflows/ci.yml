@@ -1,0 +1,46 @@
+# Typecheck, lint and test on every pull request and every push to main —
+# the checks AGENTS.md requires before any change is called done.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to the same branch makes an older run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Typecheck, lint, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # llama.rn downloads its native binaries on install. JS checks never
+      # load them, so skip the download: faster, and one less network flake.
+      RNLLAMA_SKIP_POSTINSTALL: '1'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          # React Native 0.86 and whisper.rn need >= 20.19.4 (docs/RUNNING.md).
+          node-version: '20.19'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test -- --ci
