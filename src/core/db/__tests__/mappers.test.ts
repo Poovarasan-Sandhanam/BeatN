@@ -28,6 +28,7 @@ const bareRow: JournalEntryRow = {
   transcript_generated_at: null,
   title: null,
   summary: null,
+  suggestion: null,
   reflection_model_id: null,
   reflection_model_version: null,
   reflection_prompt_version: null,

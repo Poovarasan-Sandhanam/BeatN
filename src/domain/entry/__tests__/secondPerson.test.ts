@@ -1,0 +1,41 @@
+import { toSecondPerson } from '../secondPerson';
+
+describe('toSecondPerson', () => {
+  // The three summaries the iPhone 14 showed on Home, verbatim in shape.
+  it.each([
+    [
+      'The person is looking for a new room to rebuild themselves and get more energy after a new job in London.',
+      "You're looking for a new room to rebuild yourself and get more energy after a new job in London.",
+    ],
+    [
+      'The person is planning a trip to Europe and is very happy about their new job and the sponsorship.',
+      "You're planning a trip to Europe and are very happy about your new job and the sponsorship.",
+    ],
+    [
+      'The person was feeling sleepy but still doing their job.',
+      'You were feeling sleepy but still doing your job.',
+    ],
+  ])('rewrites %p', (input, expected) => {
+    expect(toSecondPerson(input)).toBe(expected);
+  });
+
+  it.each([
+    ['The user feels tired after work.', 'You feel tired after work.'],
+    ['The speaker worries about money.', 'You worry about money.'],
+    ['The person has been busy and they want a break.', 'You have been busy and you want a break.'],
+    ['This person wishes things were calmer.', 'You wish things were calmer.'],
+    ['The person reflects on what matters to them.', 'You reflect on what matters to you.'],
+  ])('handles %p', (input, expected) => {
+    expect(toSecondPerson(input)).toBe(expected);
+  });
+
+  it.each([
+    "You're planning a trip to Europe.",
+    'A long day, but a good one.',
+    'They said the project is late.', // reported speech, not narration of the user
+    'Sleep earlier tonight.',
+    '',
+  ])('leaves %p alone — it is not narrating the user', (text) => {
+    expect(toSecondPerson(text)).toBe(text);
+  });
+});

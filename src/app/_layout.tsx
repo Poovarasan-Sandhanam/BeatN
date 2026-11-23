@@ -22,7 +22,7 @@ type Startup = 'checking' | 'ready' | 'needsModels';
 // the app opens straight onto onboarding or the journal with no blank frame.
 // Module scope, not inside a component, per the expo-splash-screen docs.
 void SplashScreen.preventAutoHideAsync();
-SplashScreen.setOptions({ duration: 300, fade: true });
+SplashScreen.setOptions({ duration: 150, fade: true });
 
 export default function RootLayout() {
   return (
@@ -106,6 +106,7 @@ function Navigator() {
         }}
       />
       <Stack.Screen name="entry/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="insights" options={{ headerShown: false }} />
       <Stack.Screen name="dev" options={{ title: 'Developer' }} />
     </Stack>
   );

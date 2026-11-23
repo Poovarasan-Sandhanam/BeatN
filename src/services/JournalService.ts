@@ -9,7 +9,10 @@
 import type { JournalEntry } from '../domain/entry/JournalEntry';
 import { describeVoice, type VoiceReading } from '../domain/voice/voiceCues';
 import { uuidv7, type RandomSource } from '../domain/ids';
-import type { JournalEntryRepository } from '../core/db/repositories/JournalEntryRepository';
+import {
+  fileName,
+  type JournalEntryRepository,
+} from '../core/db/repositories/JournalEntryRepository';
 import type { ProcessingJobRepository } from '../core/db/repositories/ProcessingJobRepository';
 import type { ProcessingQueue } from '../core/jobs/ProcessingQueue';
 import type { WavRecording } from '../core/audio/useWavRecorder';
@@ -44,8 +47,12 @@ export class JournalService {
    * navigate away immediately and the recording can never be lost because
    * transcription failed.
    */
-  async createEntryFromRecording(recording: WavRecording): Promise<string> {
-    const timestamp = this.now();
+  async createEntryFromRecording(
+    recording: WavRecording,
+    /** When it was recorded. Defaults to now; recovery passes the original time. */
+    createdAt: number = this.now(),
+  ): Promise<string> {
+    const timestamp = createdAt;
     const id = uuidv7(this.deps.random, timestamp);
 
     const entry: JournalEntry = {
@@ -80,6 +87,25 @@ export class JournalService {
     this.deps.onChange?.();
 
     return id;
+  }
+
+  /**
+   * Adds recordings found on disk that no entry knows about — left behind by
+   * a kill while paused or a crash mid-recording. Run once at launch, before
+   * anything can be recording. Returns how many were added.
+   */
+  async recoverUnsavedRecordings(
+    found: readonly (WavRecording & { createdAt: number })[],
+  ): Promise<number> {
+    if (found.length === 0) return 0;
+    const known = await this.deps.entries.knownRecordingNames();
+    let added = 0;
+    for (const recording of found) {
+      if (known.has(fileName(recording.uri))) continue;
+      await this.createEntryFromRecording(recording, recording.createdAt);
+      added += 1;
+    }
+    return added;
   }
 
   list(limit = 50, offset = 0): Promise<JournalEntry[]> {

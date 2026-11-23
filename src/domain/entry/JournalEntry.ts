@@ -62,6 +62,8 @@ export interface Transcript {
 export interface Reflection {
   title: string | null;
   summary: string;
+  /** One small thing to try today, from the same analysis. Null when none fit. */
+  suggestion: string | null;
   provenance: Provenance;
 }
 

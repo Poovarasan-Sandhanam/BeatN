@@ -4,6 +4,7 @@ import { modelRuntime, type ModelRef } from '../core/ai/ModelRuntime';
 import { getOrCreateDeviceId, openDatabase } from '../core/db/connection';
 import { JournalEntryRepository } from '../core/db/repositories/JournalEntryRepository';
 import { ProcessingJobRepository } from '../core/db/repositories/ProcessingJobRepository';
+import { findRecordings } from '../core/audio/recordingRecovery';
 import { analyseVoice } from '../core/audio/voiceAnalysis';
 import { ProcessingQueue } from '../core/jobs/ProcessingQueue';
 import { createAnalyseHandler } from '../core/jobs/handlers/analyseHandler';
@@ -12,10 +13,12 @@ import { modelManager } from '../core/models/ModelManager';
 import { DEFAULT_BUNDLE_ID, getBundle } from '../core/models/bundles';
 import { uuidv7 } from '../domain/ids';
 import { cryptoRandomSource } from '../core/platform';
+import { InsightsService } from './InsightsService';
 import { JournalService } from './JournalService';
 
 export interface Services {
   journal: JournalService;
+  insights: InsightsService;
   queue: ProcessingQueue;
   /** Bumped whenever a job settles or the user changes an entry, so lists can refetch without polling. */
   revision: number;
@@ -86,13 +89,17 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
         // After start, which returns crashed jobs to the pool: anything still
         // mid-processing with no job behind it was stranded and needs a retry.
         await entries.failOrphaned();
+        // Before the app can record: anything on disk with no entry was left by
+        // a kill while paused or a crash mid-recording. Best effort.
+        await journal.recoverUnsavedRecordings(findRecordings()).catch(() => 0);
 
         if (cancelled) {
           await queue.stop();
           return;
         }
 
-        setBuilt({ journal, queue });
+        const insights = new InsightsService({ entries, runtime: modelRuntime, resolveModel });
+        setBuilt({ journal, insights, queue });
       } catch {
         // Screens render a "not ready" state; the failure surfaces there
         // rather than being logged, per the privacy rule.

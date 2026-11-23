@@ -23,7 +23,8 @@ export type BenchmarkPhase = 'idle' | 'recording' | 'transcribing' | 'analysing'
  * instrument, not the product path.
  */
 export function useBenchmarkRun(sttModelId: string, llmModelId: string) {
-  const recorder = useWavRecorder();
+  // Own folder: benchmark clips are not journal entries and must not be recovered as such.
+  const recorder = useWavRecorder({ directoryName: 'benchmark-recordings' });
 
   const [phase, setPhase] = useState<BenchmarkPhase>('idle');
   const [log, setLog] = useState<string[]>([]);

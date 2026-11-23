@@ -11,6 +11,7 @@ import {
   entryAnalysisJsonSchema,
   validateEntryAnalysis,
 } from '../../ai/analysis';
+import { toSecondPerson } from '../../../domain/entry/secondPerson';
 import { cleanTranscript } from '../../../domain/entry/transcript';
 import { describeVoice, voiceSummaryForPrompt } from '../../../domain/voice/voiceCues';
 import { countWords, withSpeakingRate } from '../../../domain/voice/voiceFeatures';
@@ -90,13 +91,19 @@ export function createAnalyseHandler({
     const provenance = {
       modelId: model.modelId,
       modelVersion: '1',
-      promptVersion: voiceSummary ? 'analysis-v2-voice' : 'analysis-v2',
+      promptVersion: voiceSummary ? 'analysis-v3-voice' : 'analysis-v3',
       generatedAt: now(),
     };
 
     await entries.saveAnalysis(
       entry.id,
-      { title: null, summary: structured.value.summary, provenance },
+      {
+        title: null,
+        // Small models slip into "The person is…"; a journal speaks to you.
+        summary: toSecondPerson(structured.value.summary),
+        suggestion: structured.value.suggestion ? toSecondPerson(structured.value.suggestion) : null,
+        provenance,
+      },
       {
         value: structured.value.mood,
         confidence: structured.value.moodConfidence,

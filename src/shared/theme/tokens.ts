@@ -148,6 +148,8 @@ export const typography = {
   bodyStrong: { fontSize: 16, lineHeight: 24, fontWeight: '600' },
   /** Long-form reading: transcripts and reflections. */
   reading: { fontSize: 18, lineHeight: 29, fontWeight: '400', fontFamily: serif },
+  /** A glimpse of an entry in a list: the reading voice, sized to scan. */
+  excerpt: { fontSize: 16, lineHeight: 23, fontWeight: '400', fontFamily: serif },
   caption: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
   captionStrong: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
   /** Section eyebrows. Uppercase with tracking reads as structure, not shouting. */

@@ -38,6 +38,9 @@ export default function RecordScreen() {
   const [promptIndex, setPromptIndex] = useState(() => Math.floor(Math.random() * PROMPTS.length));
 
   const isRecording = recorder.state === 'recording';
+  const isPaused = recorder.state === 'paused';
+  /** A recording exists — live or paused — that Stop would save. */
+  const inSession = isRecording || isPaused;
 
   // Waveform history. Each new buffer advances `durationMs`, so that is the
   // tick. Updating state during render on a changed input is React's
@@ -83,16 +86,26 @@ export default function RecordScreen() {
     }
   }, [recorder, router, services, report]);
 
+  const resume = useCallback(async () => {
+    setErrorText('');
+    try {
+      await recorder.resume();
+    } catch (error) {
+      report(error);
+    }
+  }, [recorder, report]);
+
   // BeatN has no background audio mode, so the OS cuts the microphone when the
-  // app leaves the foreground. Save what was said rather than lose it — a
-  // locked phone or an incoming call must never cost the user an entry.
+  // app leaves the foreground. Pause — never save and navigate: closing a
+  // screen while the app is in the background left a black screen on return.
+  // The paused file is checkpointed, so even a kill loses nothing.
   useEffect(() => {
     if (!isRecording) return;
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'background') void stop();
+      if (state === 'background') recorder.pause();
     });
     return () => subscription.remove();
-  }, [isRecording, stop]);
+  }, [isRecording, recorder]);
 
   const discard = useCallback(() => {
     recorder.cancel();
@@ -100,7 +113,7 @@ export default function RecordScreen() {
   }, [recorder, router]);
 
   const close = useCallback(() => {
-    if (!isRecording || recorder.durationMs < CONFIRM_DISCARD_AFTER_MS) {
+    if (!inSession || recorder.durationMs < CONFIRM_DISCARD_AFTER_MS) {
       discard();
       return;
     }
@@ -108,7 +121,7 @@ export default function RecordScreen() {
       { text: 'Keep recording', style: 'cancel' },
       { text: 'Discard', style: 'destructive', onPress: discard },
     ]);
-  }, [discard, isRecording, recorder.durationMs]);
+  }, [discard, inSession, recorder.durationMs]);
 
   return (
     <View
@@ -124,7 +137,7 @@ export default function RecordScreen() {
       <View style={styles.topBar}>
         <IconButton
           icon="close"
-          accessibilityLabel={isRecording ? 'Discard recording' : 'Close'}
+          accessibilityLabel={inSession ? 'Discard recording' : 'Close'}
           onPress={close}
           disabled={saving}
         />
@@ -142,21 +155,23 @@ export default function RecordScreen() {
       </View>
 
       <View style={[styles.fill, styles.centre, { gap: theme.spacing.xl }]}>
-        {isRecording || saving ? (
+        {inSession || saving ? (
           <>
             <View style={{ gap: theme.spacing.xs }}>
               <Text
                 variant="timer"
                 align="center"
                 accessibilityRole="timer"
-                accessibilityLabel={`Recording, ${formatDuration(recorder.durationMs)}`}>
+                accessibilityLabel={`${isPaused ? 'Paused' : 'Recording'}, ${formatDuration(recorder.durationMs)}`}>
                 {formatDuration(recorder.durationMs)}
               </Text>
               <Text variant="caption" tone="muted" align="center">
-                {saving ? 'Saving…' : 'Listening'}
+                {saving ? 'Saving…' : isPaused ? 'Paused' : 'Listening'}
               </Text>
             </View>
-            <Waveform levels={wave} />
+            <View style={{ opacity: isPaused ? 0.35 : 1 }}>
+              <Waveform levels={wave} />
+            </View>
             <Text variant="reading" tone="faint" align="center" style={{ fontStyle: 'italic' }}>
               “{PROMPTS[promptIndex]}”
             </Text>
@@ -193,17 +208,38 @@ export default function RecordScreen() {
       )}
 
       <View style={[styles.centre, { gap: theme.spacing.md }]}>
-        <RecordControl
-          state={saving ? 'saving' : isRecording ? 'recording' : 'idle'}
-          level={recorder.level}
-          onPress={isRecording ? stop : start}
-        />
+        <View style={styles.controls}>
+          {/* Same width either side, so the main button stays centred. */}
+          <View style={styles.sideSlot}>
+            {inSession && !saving && (
+              <PressableScale
+                onPress={isPaused ? resume : recorder.pause}
+                pressedScale={0.9}
+                accessibilityRole="button"
+                accessibilityLabel={isPaused ? 'Resume recording' : 'Pause recording'}
+                style={[
+                  styles.sideButton,
+                  { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+                ]}>
+                <Glyph name={isPaused ? 'mic' : 'pause'} color={theme.colors.ink} size={20} />
+              </PressableScale>
+            )}
+          </View>
+          <RecordControl
+            state={saving ? 'saving' : inSession ? 'recording' : 'idle'}
+            level={isRecording ? recorder.level : 0}
+            onPress={inSession ? stop : start}
+          />
+          <View style={styles.sideSlot} />
+        </View>
         <Text variant="caption" tone="muted" align="center">
           {saving
             ? 'One moment'
-            : isRecording
-              ? 'Tap to finish. It’s transcribed in the background.'
-              : 'Tap to start talking'}
+            : isPaused
+              ? 'Paused. Resume to keep going, or tap ■ to save.'
+              : isRecording
+                ? 'Tap ■ to save. Pause any time.'
+                : 'Tap to start talking'}
         </Text>
       </View>
     </View>
@@ -223,7 +259,8 @@ function Waveform({ levels }: { levels: number[] }) {
             styles.waveBar,
             {
               // A floor keeps silence visible as a quiet line rather than nothing.
-              height: 4 + Math.min(1, level * 1.6) * 60,
+              // `level` is already on a decibel scale (0..1), so it maps straight to height.
+              height: 4 + level * 60,
               backgroundColor: theme.colors.recording,
               opacity: 0.25 + (i / WAVE_BARS) * 0.75,
             },
@@ -251,7 +288,7 @@ function RecordControl({
   // The halo swells with your voice, so you can see it is hearing you.
   useEffect(() => {
     Animated.spring(halo, {
-      toValue: state === 'recording' ? Math.min(1, level * 2) : 0,
+      toValue: state === 'recording' ? level : 0,
       useNativeDriver: true,
       speed: 30,
       bounciness: 0,
@@ -308,6 +345,16 @@ const styles = StyleSheet.create({
   privacy: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6 },
   wave: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 72, gap: 3 },
   waveBar: { width: 3, borderRadius: 2 },
+  controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  sideSlot: { width: 64, alignItems: 'center' },
+  sideButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   controlBox: { width: CONTROL * 1.7, height: CONTROL * 1.7, alignItems: 'center', justifyContent: 'center' },
   halo: { position: 'absolute', width: CONTROL, height: CONTROL, borderRadius: CONTROL / 2 },
   control: {

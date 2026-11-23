@@ -37,6 +37,11 @@ export class LlamaEngine implements LocalLLMEngine {
    * break again, and a reload costs seconds.
    */
   private cpuOnly = false;
+  /**
+   * Whether the current native context has run a completion. Each context
+   * runs exactly one, then is replaced — see `generate` for why.
+   */
+  private contextUsed = false;
 
   constructor(options: LlamaEngineOptions = {}) {
     this.options = { ...DEFAULTS, ...options };
@@ -62,9 +67,13 @@ export class LlamaEngine implements LocalLLMEngine {
     return this.context?.model?.desc ?? '';
   }
 
-  /** llama.cpp compiles a JSON Schema to a GBNF grammar at sampling time. */
+  /**
+   * Off. Grammar-constrained sampling is the riskiest path into llama.rn's
+   * sampler setup (see `generate`); structured output is validated and
+   * normalised in JS instead, which costs at most one retry.
+   */
   get supportsGrammar(): boolean {
-    return true;
+    return false;
   }
 
   async loadModel(modelPath: string, onProgress?: (percent: number) => void): Promise<void> {
@@ -81,6 +90,7 @@ export class LlamaEngine implements LocalLLMEngine {
       },
       onProgress,
     );
+    this.contextUsed = false;
     this.loadTimeMs = Date.now() - startedAt;
   }
 
@@ -91,7 +101,19 @@ export class LlamaEngine implements LocalLLMEngine {
     await context.release();
   }
 
+  /**
+   * Runs one completion on a fresh native context.
+   *
+   * Works around a crash in llama.rn 0.12.9 (prebuilt, so not patchable here):
+   * `initSampling()` frees the previous sampler and then builds a new one, but
+   * if building throws, the freed pointer stays in place. The next completion
+   * — or releasing the context — frees it again and the app aborts with
+   * "pointer being freed was not allocated". A context that runs only one
+   * completion never has a previous sampler to leave dangling, so the bug is
+   * unreachable. The model is memory-mapped, so a new context is cheap.
+   */
   async generate(prompt: string, options: GenerationOptions = {}): Promise<GenerationResult> {
+    if (this.contextUsed && this.modelPath) await this.loadModel(this.modelPath);
     try {
       return await this.complete(prompt, options);
     } catch (error) {
@@ -107,6 +129,9 @@ export class LlamaEngine implements LocalLLMEngine {
   private async complete(prompt: string, options: GenerationOptions): Promise<GenerationResult> {
     const context = this.context;
     if (!context) throw new Error('LLM_MODEL_NOT_LOADED');
+    // Marked before the call, not after: a completion that throws may have
+    // poisoned the context, and must never be followed by another on it.
+    this.contextUsed = true;
 
     const startedAt = Date.now();
     let firstTokenAt = 0;
@@ -142,7 +167,7 @@ export class LlamaEngine implements LocalLLMEngine {
 
   async generateStructured<T>(
     prompt: string,
-    jsonSchema: object,
+    _jsonSchema: object,
     validate: (value: unknown) => T,
     options: GenerationOptions = {},
   ): Promise<StructuredResult<T>> {
@@ -152,13 +177,11 @@ export class LlamaEngine implements LocalLLMEngine {
     let metrics: GenerationMetrics | null = null;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      // Attempt 1 is grammar-constrained, so malformed JSON is impossible and
-      // `mood` can only be a member of the enum. Attempt 2 drops the grammar:
-      // if the model painted itself into a corner under the constraint —
-      // emitting a syntactically valid object that fails semantic validation —
-      // a free run at temperature 0 with a blunter instruction can do better.
-      const useGrammar = attempt === 1;
-      const attemptPrompt = useGrammar
+      // No grammar (see `supportsGrammar`). Attempt 2, if needed, runs at
+      // temperature 0 with a blunter instruction.
+      const firstAttempt = attempt === 1;
+      // The nudge only makes sense if there was a reply to correct.
+      const attemptPrompt = firstAttempt || lastRaw === ''
         ? prompt
         : `${prompt}\n\nYour previous reply was not valid. Reply with the JSON object only. No prose, no markdown fence.`;
 
@@ -166,14 +189,12 @@ export class LlamaEngine implements LocalLLMEngine {
       try {
         generated = await this.generate(attemptPrompt, {
           ...options,
-          temperature: useGrammar ? (options.temperature ?? 0.2) : 0,
-          jsonSchema: useGrammar ? jsonSchema : undefined,
+          temperature: firstAttempt ? (options.temperature ?? 0.2) : 0,
         });
       } catch (error) {
-        // A native error under the grammar (llama.cpp's schema-to-grammar
-        // path throws on schemas it cannot compile) must still leave the
-        // unconstrained attempt to try. Without the grammar, it is final.
-        if (!useGrammar) throw error;
+        // A native error on the first attempt gets one more try — on a fresh
+        // context, which `generate` guarantees. A second one is final.
+        if (!firstAttempt) throw error;
         lastError = error;
         continue;
       }
@@ -188,7 +209,7 @@ export class LlamaEngine implements LocalLLMEngine {
           raw: lastRaw,
           metrics,
           attempts: attempt,
-          grammarConstrained: useGrammar,
+          grammarConstrained: false,
         };
       } catch (error) {
         lastError = error;

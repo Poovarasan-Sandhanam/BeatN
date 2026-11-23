@@ -62,6 +62,22 @@ export class WavFileWriter {
   }
 
   /**
+   * Make the file on disk a complete, valid WAV of everything so far, and
+   * carry on. Used on pause: if the app is killed while paused, what was said
+   * is still a playable recording rather than a file with a placeholder header.
+   */
+  checkpoint(): void {
+    if (!this.started) throw new Error('WAV_WRITER_NOT_STARTED');
+    if (this.closed) throw new Error('WAV_WRITER_CLOSED');
+
+    const dataByteLength = this.frameCount * 2;
+    this.sink.offset = 0;
+    this.sink.writeBytes(buildWavHeader(dataByteLength, this.sampleRate, this.channels));
+    // Back to the end, so the next append continues the audio.
+    this.sink.offset = WAV_HEADER_BYTES + dataByteLength;
+  }
+
+  /**
    * Rewrite the header with the real sizes and close.
    *
    * Returns the finished file's byte length so the caller does not have to

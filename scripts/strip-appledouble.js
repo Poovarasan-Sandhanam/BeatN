@@ -11,6 +11,9 @@
  *     called `._name` and reports it as missing.
  *   - CocoaPods sees both `App.xcodeproj` and `._App.xcodeproj` and reports
  *     that it "could not automatically select an Xcode project".
+ *   - Git reads `.git/refs/heads/feat/._name` as a branch with an invalid name
+ *     and no valid commit. `git fsck` reports badRefName, and the shallow
+ *     clone EAS Build makes before uploading fails with exit code 128.
  *
  * Runs as a postinstall hook and again before `pod install`. It is a no-op on
  * platforms other than macOS. Pass directories as arguments to override the
@@ -24,7 +27,7 @@ if (process.platform !== 'darwin') process.exit(0);
 const projectRoot = path.join(__dirname, '..');
 const targets = process.argv.slice(2).length
   ? process.argv.slice(2).map((target) => path.resolve(projectRoot, target))
-  : ['node_modules', 'ios', 'android', 'patches'].map((dir) => path.join(projectRoot, dir));
+  : ['.git', 'node_modules', 'ios', 'android', 'patches'].map((dir) => path.join(projectRoot, dir));
 
 let removed = 0;
 

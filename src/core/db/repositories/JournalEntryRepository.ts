@@ -33,7 +33,7 @@ const ENTRY_COLUMNS = `
   audio_uri, audio_duration_ms, audio_sample_rate, audio_channels, audio_byte_length,
   transcript_text, transcript_language, transcript_model_id, transcript_model_version,
   transcript_generated_at,
-  title, summary, reflection_model_id, reflection_model_version, reflection_prompt_version,
+  title, summary, suggestion, reflection_model_id, reflection_model_version, reflection_prompt_version,
   reflection_generated_at,
   mood, mood_confidence, mood_model_id, mood_model_version, mood_generated_at,
   voice_json,
@@ -155,7 +155,7 @@ export class JournalEntryRepository {
     await this.db.withTransactionAsync(async () => {
       await this.db.runAsync(
         `UPDATE journal_entries
-           SET title = ?, summary = ?,
+           SET title = ?, summary = ?, suggestion = ?,
                reflection_model_id = ?, reflection_model_version = ?,
                reflection_prompt_version = ?, reflection_generated_at = ?,
                mood = ?, mood_confidence = ?,
@@ -165,6 +165,7 @@ export class JournalEntryRepository {
         [
           reflection.title,
           reflection.summary,
+          reflection.suggestion,
           reflection.provenance.modelId,
           reflection.provenance.modelVersion,
           reflection.provenance.promptVersion ?? null,
@@ -213,6 +214,59 @@ export class JournalEntryRepository {
        WHERE id = ? AND deleted_at IS NULL`,
       [timestamp, timestamp, id],
     );
+  }
+
+  /**
+   * File names of every recording any entry has ever pointed at — deleted
+   * entries included, so deleting an entry never brings its audio back as a
+   * "recovered" recording. Names, not URIs: the path prefix can differ
+   * between app versions while the name cannot.
+   */
+  async knownRecordingNames(): Promise<Set<string>> {
+    const rows = await this.db.getAllAsync<{ audio_uri: string }>(
+      'SELECT audio_uri FROM journal_entries WHERE audio_uri IS NOT NULL',
+    );
+    return new Set(rows.map((row) => fileName(row.audio_uri)));
+  }
+
+  /**
+   * Entries recorded in [from, to), oldest first, with their topics — for the
+   * Insights screen. Topics come in one query for the whole range rather than
+   * one per entry.
+   */
+  async listBetween(from: number, to: number, limit = 2000): Promise<JournalEntry[]> {
+    const rows = await this.db.getAllAsync<JournalEntryRow>(
+      `SELECT ${ENTRY_COLUMNS} FROM journal_entries
+        WHERE deleted_at IS NULL AND created_at >= ? AND created_at < ?
+        ORDER BY created_at ASC
+        LIMIT ?`,
+      [from, to, limit],
+    );
+    if (rows.length === 0) return [];
+
+    const topicRows = await this.db.getAllAsync<TopicRow>(
+      `SELECT t.entry_id, t.name, t.confidence FROM entry_topics t
+         JOIN journal_entries e ON e.id = t.entry_id
+        WHERE e.deleted_at IS NULL AND e.created_at >= ? AND e.created_at < ?
+        ORDER BY t.confidence DESC`,
+      [from, to],
+    );
+    const topicsByEntry = new Map<string, ScoredTopic[]>();
+    for (const row of topicRows) {
+      topicsByEntry.set(row.entry_id, [...(topicsByEntry.get(row.entry_id) ?? []), rowToTopic(row)]);
+    }
+    return rows.map((row) => rowToEntry(row, topicsByEntry.get(row.id) ?? []));
+  }
+
+  /** Voice measurements from before a time, newest first — the baseline for judging a period. */
+  async voicesBefore(before: number, limit = 20): Promise<VoiceFeatures[]> {
+    const rows = await this.db.getAllAsync<{ voice_json: string | null }>(
+      `SELECT voice_json FROM journal_entries
+        WHERE deleted_at IS NULL AND voice_json IS NOT NULL AND created_at < ?
+        ORDER BY created_at DESC LIMIT ?`,
+      [before, limit],
+    );
+    return rows.map((row) => parseVoice(row.voice_json)).filter((v): v is VoiceFeatures => v !== null);
   }
 
   async saveVoice(id: string, voice: VoiceFeatures): Promise<void> {
@@ -297,4 +351,8 @@ export class JournalEntryRepository {
     );
     return rows.map(rowToEntity);
   }
+}
+
+export function fileName(uri: string): string {
+  return uri.slice(uri.lastIndexOf('/') + 1);
 }

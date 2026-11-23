@@ -1,4 +1,5 @@
 import type { JournalEntry, ProcessingState } from '../../domain/entry/JournalEntry';
+import { toSecondPerson } from '../../domain/entry/secondPerson';
 import { cleanTranscript } from '../../domain/entry/transcript';
 
 export interface EntryStatus {
@@ -75,7 +76,8 @@ export function titleOf(entry: JournalEntry): string | null {
 
 /** One line for the list: the summary if we have it, else the transcript. */
 export function previewOf(entry: JournalEntry): string | null {
-  if (entry.reflection?.summary) return entry.reflection.summary;
+  // Also at display time, so entries saved before the fix read right too.
+  if (entry.reflection?.summary) return toSecondPerson(entry.reflection.summary);
   const spoken = spokenText(entry);
   if (spoken) return spoken;
   return null;
