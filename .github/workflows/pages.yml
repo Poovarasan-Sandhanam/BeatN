@@ -1,0 +1,43 @@
+# Publishes site/ (home, privacy policy, support) to GitHub Pages — the URLs
+# App Store Connect asks for. Runs when site/ changes on main, or by hand.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ['site/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # These pages are public and Apple shows them to users. Never publish
+      # them with the contact address still unset.
+      - name: Refuse to publish placeholders
+        run: |
+          if grep -rl 'SUPPORT_EMAIL_PLACEHOLDER' site; then
+            echo "::error::Replace SUPPORT_EMAIL_PLACEHOLDER in the files above with the real support address before publishing."
+            exit 1
+          fi
+
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v5
