@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-export type GlyphName = 'mic' | 'stop' | 'play' | 'pause' | 'close' | 'back' | 'lock';
+export type GlyphName = 'mic' | 'stop' | 'play' | 'pause' | 'close' | 'back' | 'lock' | 'info';
 
 export interface GlyphProps {
   name: GlyphName;
@@ -13,7 +13,7 @@ export interface GlyphProps {
 /**
  * A handful of icons drawn from plain Views.
  *
- * The app needs seven icons. An icon font or SVG renderer would add a native
+ * The app needs eight icons. An icon font or SVG renderer would add a native
  * dependency and a rebuild for that; these are geometric enough to draw.
  */
 export function Glyph({ name, color, size = 24 }: GlyphProps) {
@@ -143,6 +143,43 @@ export function Glyph({ name, color, size = 24 }: GlyphProps) {
             transform: [{ rotate: '45deg' }],
           }}
         />
+      );
+      break;
+    case 'info':
+      // A ring with a dot and a stem: the universal "about" mark.
+      content = (
+        <>
+          <View
+            style={{
+              position: 'absolute',
+              width: s * 0.86,
+              height: s * 0.86,
+              borderRadius: s * 0.43,
+              borderWidth: stroke,
+              borderColor: color,
+            }}
+          />
+          <View
+            style={{
+              position: 'absolute',
+              top: s * 0.26,
+              width: stroke * 1.2,
+              height: stroke * 1.2,
+              borderRadius: stroke,
+              backgroundColor: color,
+            }}
+          />
+          <View
+            style={{
+              position: 'absolute',
+              top: s * 0.42,
+              width: stroke,
+              height: s * 0.3,
+              borderRadius: stroke / 2,
+              backgroundColor: color,
+            }}
+          />
+        </>
       );
       break;
     case 'lock':

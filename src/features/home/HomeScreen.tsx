@@ -15,7 +15,7 @@ import type { JournalEntry } from '../../domain/entry/JournalEntry';
 import { useServices } from '../../services/ServiceProvider';
 import { formatDuration } from '../../shared/format';
 import { useTheme } from '../../shared/theme';
-import { Button, Chip, FadeIn, Glyph, PressableScale, Skeleton, Text } from '../../shared/ui';
+import { Button, Chip, FadeIn, Glyph, IconButton, PressableScale, Skeleton, Text } from '../../shared/ui';
 import { describeStatus, formatClockTime, formatEntryDate, isSilent, previewOf } from './entryStatus';
 import { computeInsights, formatLongDate, greetingFor, groupByDay } from './journalInsights';
 import { moodLook } from './mood';
@@ -72,9 +72,13 @@ export default function HomeScreen() {
 
   const header = (
     <View style={{ gap: theme.spacing.xs, paddingTop: insets.top + theme.spacing.lg }}>
-      <Text variant="label" tone="faint">
-        {formatLongDate()}
-      </Text>
+      <View style={styles.headerRow}>
+        <Text variant="label" tone="faint">
+          {formatLongDate()}
+        </Text>
+        {/* Privacy policy and support, inside the app (App Review 5.1.1). */}
+        <IconButton icon="info" accessibilityLabel="About BeatN, privacy and support" onPress={() => router.push('/about')} />
+      </View>
       {/* Long-press opens developer tools — in development builds only. A
           release build has no hidden features (App Review guideline 2.3.1). */}
       <Pressable
@@ -433,6 +437,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   stats: { flexDirection: 'row' },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   insightsLink: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   stat: { flex: 1, borderWidth: StyleSheet.hairlineWidth, gap: 2 },
   busyChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4 },
