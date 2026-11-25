@@ -108,6 +108,7 @@ function Navigator() {
       />
       <Stack.Screen name="entry/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="insights" options={{ headerShown: false }} />
+      <Stack.Screen name="about" options={{ headerShown: false }} />
       <Stack.Screen name="dev" options={{ title: 'Developer' }} />
     </Stack>
   );
