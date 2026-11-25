@@ -30,6 +30,8 @@ export interface JournalServiceDeps {
    * reflects the user's own action the moment it lands.
    */
   onChange?: () => void;
+  /** Removes a recording file from the phone. Injected so tests need no file system. */
+  deleteAudio?: (uri: string) => void;
 }
 
 export class JournalService {
@@ -127,9 +129,24 @@ export class JournalService {
     this.deps.onChange?.();
   }
 
+  /**
+   * Erases an entry: its words, moods and measurements are wiped from the
+   * database and its recording deleted from the phone. Only a bare tombstone
+   * (id and dates) stays, for sync.
+   */
   async delete(id: string): Promise<void> {
-    await this.deps.entries.softDelete(id);
+    const audioUri = await this.deps.entries.eraseEntry(id);
+    if (audioUri) this.deps.deleteAudio?.(audioUri);
     this.deps.onChange?.();
+  }
+
+  /**
+   * Finishes erasing entries deleted by earlier versions, which only hid
+   * them. Run once at launch; cheap when there is nothing to do.
+   */
+  async eraseDeletedLeftovers(): Promise<void> {
+    const uris = await this.deps.entries.eraseDeletedContent();
+    for (const uri of uris) this.deps.deleteAudio?.(uri);
   }
 
   /** Re-queue a failed entry at the step that failed. */

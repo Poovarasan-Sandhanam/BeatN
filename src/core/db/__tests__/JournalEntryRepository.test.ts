@@ -180,19 +180,49 @@ describe('saveAnalysis', () => {
   });
 });
 
-describe('softDelete', () => {
-  it('tombstones rather than deleting, because a hard delete cannot be synced', async () => {
+describe('eraseEntry', () => {
+  it('keeps a tombstone but wipes every word, mood and measurement', async () => {
     const db = new RecordingDatabase();
-    await new JournalEntryRepository(db, () => 4_000).softDelete('entry-1');
+    db.firstRow = { audio_uri: 'file:///r/1.wav' } as never;
+    const uri = await new JournalEntryRepository(db, () => 4_000).eraseEntry('entry-1');
 
-    expect(db.run[0].sql).toContain('SET deleted_at = ?');
-    expect(db.run[0].sql).not.toContain('DELETE FROM journal_entries');
-    expect(db.run[0].params[0]).toBe(4_000);
+    expect(uri).toBe('file:///r/1.wav');
+    const update = db.run.find((r) => r.sql.includes('UPDATE journal_entries'))!;
+    expect(update.sql).toContain('deleted_at = COALESCE(deleted_at, ?)');
+    for (const column of ['transcript_text', 'summary', 'suggestion', 'mood', 'voice_json', 'title']) {
+      expect(update.sql).toContain(`${column} = NULL`);
+    }
+    expect(update.sql).not.toContain('DELETE FROM journal_entries');
+    // The file name stays, so recovery never resurrects the recording.
+    expect(update.sql).not.toContain('audio_uri = NULL');
   });
 
-  it('does not re-stamp an already deleted entry', async () => {
+  it('removes topics, entities and pending work', async () => {
     const db = new RecordingDatabase();
-    await new JournalEntryRepository(db).softDelete('entry-1');
+    db.firstRow = { audio_uri: null } as never;
+    await new JournalEntryRepository(db).eraseEntry('entry-1');
+    const sql = db.run.map((r) => r.sql).join('\n');
+    expect(sql).toContain('DELETE FROM entry_topics WHERE entry_id = ?');
+    expect(sql).toContain('DELETE FROM entry_entities WHERE entry_id = ?');
+    expect(sql).toContain('DELETE FROM processing_jobs WHERE entry_id = ?');
+  });
+
+  it('does nothing for an entry that does not exist', async () => {
+    const db = new RecordingDatabase();
+    db.firstRow = null;
+    expect(await new JournalEntryRepository(db).eraseEntry('missing')).toBeNull();
+    expect(db.run).toEqual([]);
+  });
+});
+
+describe('content writes never refill an erased entry', () => {
+  it('saveTranscript skips deleted entries', async () => {
+    const db = new RecordingDatabase();
+    await new JournalEntryRepository(db).saveTranscript('entry-1', {
+      text: 'x',
+      language: 'en',
+      provenance: { modelId: 'm', modelVersion: '1', generatedAt: 0 },
+    });
     expect(db.run[0].sql).toContain('AND deleted_at IS NULL');
   });
 });

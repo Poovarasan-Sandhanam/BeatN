@@ -6,15 +6,16 @@ import { StyleSheet, View } from 'react-native';
 
 import { useModelLifecycle } from '../core/ai/useModelLifecycle';
 import { BundleInstaller } from '../core/models/BundleInstaller';
-import { DEFAULT_BUNDLE_ID, getBundle } from '../core/models/bundles';
+import { activeBundle } from '../core/models/activeBundle';
 import { AppLock } from '../features/lock/AppLock';
 import OnboardingScreen from '../features/onboarding/OnboardingScreen';
 import { ServiceProvider } from '../services/ServiceProvider';
 import { ThemeProvider, useTheme } from '../shared/theme';
 import { ErrorBoundary, Glyph } from '../shared/ui';
 
-// PROVISIONAL until Step 1 produces real-device benchmarks. See BENCHMARKS.md.
-const bundle = getBundle(DEFAULT_BUNDLE_ID);
+// Chosen from this phone's RAM: Light on 3 GB iPhones, Standard otherwise.
+// Which models each bundle holds is still provisional — see BENCHMARKS.md.
+const bundle = activeBundle();
 
 type Startup = 'checking' | 'ready' | 'needsModels';
 

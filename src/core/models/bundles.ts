@@ -45,6 +45,9 @@ export const MODEL_BUNDLES: readonly ModelBundle[] = [
 ];
 
 /**
+ * The bundle when the device cannot be measured, and the developer screen's
+ * starting point. Real devices use `activeBundle()` (activeBundle.ts).
+ *
  * PROVISIONAL. Which bundle is the default is the output of Step 1 — it must
  * come from real-device benchmarks, not from a guess. See BENCHMARKS.md.
  * Changing this one constant is how that decision gets applied.
@@ -67,6 +70,25 @@ export function bundleBytes(bundle: ModelBundle): number {
 }
 
 const CLASS_RANK: Record<DeviceClass, number> = { low: 0, mid: 1, high: 2 };
+
+const GB = 1024 ** 3;
+
+/**
+ * A device's class from its RAM. The 1.1 GB language model needs room: iOS
+ * lets one app use only part of the phone's memory, and on 3 GB iPhones
+ * (iPhone 8 Plus, X, XS, XR, 11 Pro era) that is too little to hold it
+ * safely. Thresholds sit between real RAM sizes (3, 4, 6, 8 GB), so a
+ * phone never lands on the boundary.
+ *
+ * Unknown memory gets `mid`: every phone that can install BeatN and fails
+ * to report its RAM is still treated as an ordinary phone, not a weak one.
+ */
+export function deviceClassForMemory(totalMemoryBytes: number | null): DeviceClass {
+  if (totalMemoryBytes === null || !Number.isFinite(totalMemoryBytes) || totalMemoryBytes <= 0) return 'mid';
+  if (totalMemoryBytes < 3.5 * GB) return 'low';
+  if (totalMemoryBytes < 7 * GB) return 'mid';
+  return 'high';
+}
 
 /** The largest bundle the device can reasonably run. */
 export function recommendedBundle(deviceClass: DeviceClass): ModelBundle {
