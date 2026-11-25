@@ -1,0 +1,66 @@
+/* BeatN's own palette (src/shared/theme/tokens.ts): warm paper, ink, one indigo. */
+:root {
+  --bg: #f6f3ee;
+  --surface: #ffffff;
+  --ink: #1a1714;
+  --muted: #6b6459;
+  --faint: #a0988b;
+  --border: #e3dcd1;
+  --accent: #4251a8;
+  --accent-soft: #e7e9f6;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f0e11;
+    --surface: #1a191d;
+    --ink: #f4f1ec;
+    --muted: #a7a096;
+    --faint: #6e6962;
+    --border: #2a2830;
+    --accent: #a8b3ff;
+    --accent-soft: #1e2142;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+main { max-width: 680px; margin: 0 auto; padding: 48px 16px 64px; }
+header.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
+.mark {
+  width: 40px; height: 40px; border-radius: 13px; background: var(--accent);
+  display: grid; place-items: center; flex: none;
+}
+.mark svg { width: 20px; height: 20px; }
+.brand a { color: var(--ink); text-decoration: none; font-weight: 600; font-size: 18px; }
+h1, h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; line-height: 1.2; }
+h1 { font-size: 40px; margin: 0 0 8px; letter-spacing: -0.5px; }
+h2 { font-size: 24px; margin: 40px 0 8px; }
+p, li { color: var(--ink); }
+.lede { color: var(--muted); font-size: 19px; margin-top: 0; }
+.meta { color: var(--faint); font-size: 14px; }
+a { color: var(--accent); }
+ul { padding-left: 20px; }
+li { margin: 6px 0; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+  padding: 20px; margin: 24px 0;
+}
+.callout { background: var(--accent-soft); border-radius: 16px; padding: 16px 20px; margin: 24px 0; }
+.links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.button {
+  display: inline-block; padding: 12px 20px; border-radius: 999px;
+  background: var(--ink); color: var(--bg); text-decoration: none; font-weight: 600;
+}
+.button.secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--border); }
+footer { margin-top: 56px; color: var(--faint); font-size: 14px; }
+footer a { color: var(--faint); }
+details { border-top: 1px solid var(--border); padding: 14px 0; }
+details:last-of-type { border-bottom: 1px solid var(--border); }
+summary { cursor: pointer; font-weight: 600; }
+@media (max-width: 480px) { h1 { font-size: 32px; } main { padding-top: 32px; } }
