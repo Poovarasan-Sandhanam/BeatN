@@ -6,7 +6,8 @@
 # (expo.dev → Account settings → Access tokens → Create).
 #
 # iOS uploads to TestFlight with the App Store credentials already stored on
-# EAS. Android uploads to Play's internal track only once a Google service
+# EAS. "android-apk" builds a test APK you install from a link on any Android
+# phone — no Play Store, no Google account. Android uploads to Play's internal track only once a Google service
 # account key has been added to EAS (`npx eas-cli credentials`); until then
 # the Android build still succeeds and only its submission fails, on EAS.
 name: Beta release
@@ -15,9 +16,9 @@ on:
   workflow_dispatch:
     inputs:
       platform:
-        description: Which app to build
+        description: 'Which app to build (android-apk: a test APK to install from a link, no Play Store)'
         type: choice
-        options: [ios, android, all]
+        options: [ios, android, all, android-apk]
         default: ios
       track:
         description: 'Android only: internal testing, or the closed test that counts toward Play''s 14-day requirement'
@@ -99,6 +100,12 @@ jobs:
           submit_profile=beta
           if [ "${{ inputs.track }}" = "closed" ]; then submit_profile=closed; fi
           eas build --platform android --profile beta --auto-submit-with-profile "$submit_profile" --non-interactive --no-wait
+
+      - name: Build Android test APK (no store)
+        if: inputs.platform == 'android-apk'
+        # Internal distribution: EAS gives a link that installs on any Android
+        # phone. Nothing is submitted anywhere.
+        run: eas build --platform android --profile preview --non-interactive --no-wait
 
       - name: Where to follow it
         run: |

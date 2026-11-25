@@ -5,6 +5,7 @@ import {
   Alert,
   Animated,
   AppState,
+  BackHandler,
   Linking,
   Pressable,
   StyleSheet,
@@ -122,6 +123,20 @@ export default function RecordScreen() {
       { text: 'Discard', style: 'destructive', onPress: discard },
     ]);
   }, [discard, inSession, recorder.durationMs]);
+
+  // Android's Back button. iOS blocks the swipe-back on this screen; on
+  // Android, Back would close it and silently drop the recording. While a
+  // recording exists, Back behaves like ✕ (asking before discarding); while
+  // saving, it waits; otherwise it closes the screen as usual.
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (saving) return true;
+      if (!inSession) return false;
+      close();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [saving, inSession, close]);
 
   return (
     <View
