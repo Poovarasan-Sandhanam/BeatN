@@ -28,6 +28,17 @@ import {
 } from '../mappers';
 import type { Database, SqlValue } from '../types';
 
+/** Every column that holds something the person said or the app derived from it. */
+const ERASED_CONTENT = `
+  transcript_text = NULL, transcript_language = NULL, transcript_model_id = NULL,
+  transcript_model_version = NULL, transcript_generated_at = NULL,
+  title = NULL, summary = NULL, suggestion = NULL,
+  reflection_model_id = NULL, reflection_model_version = NULL,
+  reflection_prompt_version = NULL, reflection_generated_at = NULL,
+  mood = NULL, mood_confidence = NULL, mood_model_id = NULL, mood_model_version = NULL,
+  mood_generated_at = NULL, voice_json = NULL, processing_error = NULL,
+  audio_duration_ms = 0, audio_byte_length = 0`;
+
 const ENTRY_COLUMNS = `
   id, created_at, updated_at, deleted_at,
   audio_uri, audio_duration_ms, audio_sample_rate, audio_channels, audio_byte_length,
@@ -128,7 +139,7 @@ export class JournalEntryRepository {
          SET transcript_text = ?, transcript_language = ?,
              transcript_model_id = ?, transcript_model_version = ?, transcript_generated_at = ?,
              updated_at = ?, version = version + 1
-       WHERE id = ?`,
+       WHERE id = ? AND deleted_at IS NULL`,
       [
         transcript.text,
         transcript.language,
@@ -153,7 +164,9 @@ export class JournalEntryRepository {
     entities: MentionedEntity[],
   ): Promise<void> {
     await this.db.withTransactionAsync(async () => {
-      await this.db.runAsync(
+      // Guarded: an analysis still running when the entry was deleted must
+      // not write its words back into the erased row.
+      const updated = await this.db.runAsync(
         `UPDATE journal_entries
            SET title = ?, summary = ?, suggestion = ?,
                reflection_model_id = ?, reflection_model_version = ?,
@@ -161,7 +174,7 @@ export class JournalEntryRepository {
                mood = ?, mood_confidence = ?,
                mood_model_id = ?, mood_model_version = ?, mood_generated_at = ?,
                updated_at = ?, version = version + 1
-         WHERE id = ?`,
+         WHERE id = ? AND deleted_at IS NULL`,
         [
           reflection.title,
           reflection.summary,
@@ -179,6 +192,7 @@ export class JournalEntryRepository {
           id,
         ],
       );
+      if (updated.changes === 0) return;
 
       await this.db.runAsync('DELETE FROM entry_topics WHERE entry_id = ?', [id]);
       for (const topic of topics) {
@@ -206,14 +220,63 @@ export class JournalEntryRepository {
     );
   }
 
-  /** Tombstone, never a hard delete — a hard delete cannot be synced. */
-  async softDelete(id: string): Promise<void> {
-    const timestamp = this.now();
-    await this.db.runAsync(
-      `UPDATE journal_entries SET deleted_at = ?, updated_at = ?, version = version + 1
-       WHERE id = ? AND deleted_at IS NULL`,
-      [timestamp, timestamp, id],
+  /**
+   * Erases an entry: every word, mood and measurement is wiped, its topics,
+   * entities and pending work removed, and a bare tombstone kept.
+   *
+   * A tombstone, not a hard delete, because sync will need to know the entry
+   * existed and is gone. It keeps the id, dates and the recording's file name
+   * — none of it is anything the person said. The file name stays so that
+   * launch-time recovery never mistakes a leftover file for an unsaved entry;
+   * the caller deletes the file itself. Returns the recording's URI, if any.
+   */
+  async eraseEntry(id: string): Promise<string | null> {
+    const row = await this.db.getFirstAsync<{ audio_uri: string | null }>(
+      'SELECT audio_uri FROM journal_entries WHERE id = ?',
+      [id],
     );
+    if (!row) return null;
+
+    const timestamp = this.now();
+    await this.db.withTransactionAsync(async () => {
+      await this.db.runAsync(
+        `UPDATE journal_entries
+            SET deleted_at = COALESCE(deleted_at, ?), ${ERASED_CONTENT},
+                updated_at = ?, version = version + 1
+          WHERE id = ?`,
+        [timestamp, timestamp, id],
+      );
+      await this.db.runAsync('DELETE FROM entry_topics WHERE entry_id = ?', [id]);
+      await this.db.runAsync('DELETE FROM entry_entities WHERE entry_id = ?', [id]);
+      await this.db.runAsync('DELETE FROM processing_jobs WHERE entry_id = ?', [id]);
+    });
+    return row.audio_uri;
+  }
+
+  /**
+   * Erases what earlier versions left behind: before erasing existed, delete
+   * only hid an entry and kept its content. Returns every deleted entry's
+   * recording URI so the caller can make sure the files are gone too.
+   */
+  async eraseDeletedContent(): Promise<string[]> {
+    const rows = await this.db.getAllAsync<{ audio_uri: string }>(
+      'SELECT audio_uri FROM journal_entries WHERE deleted_at IS NOT NULL AND audio_uri IS NOT NULL',
+    );
+    await this.db.withTransactionAsync(async () => {
+      await this.db.runAsync(
+        `UPDATE journal_entries SET ${ERASED_CONTENT}
+          WHERE deleted_at IS NOT NULL
+            AND (transcript_text IS NOT NULL OR summary IS NOT NULL OR mood IS NOT NULL
+                 OR voice_json IS NOT NULL OR suggestion IS NOT NULL)`,
+      );
+      for (const table of ['entry_topics', 'entry_entities', 'processing_jobs']) {
+        await this.db.runAsync(
+          `DELETE FROM ${table}
+            WHERE entry_id IN (SELECT id FROM journal_entries WHERE deleted_at IS NOT NULL)`,
+        );
+      }
+    });
+    return rows.map((row) => row.audio_uri);
   }
 
   /**

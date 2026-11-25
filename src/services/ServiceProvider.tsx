@@ -4,13 +4,14 @@ import { modelRuntime, type ModelRef } from '../core/ai/ModelRuntime';
 import { getOrCreateDeviceId, openDatabase } from '../core/db/connection';
 import { JournalEntryRepository } from '../core/db/repositories/JournalEntryRepository';
 import { ProcessingJobRepository } from '../core/db/repositories/ProcessingJobRepository';
+import { deleteRecordingFile } from '../core/audio/recordingFiles';
 import { findRecordings } from '../core/audio/recordingRecovery';
 import { analyseVoice } from '../core/audio/voiceAnalysis';
 import { ProcessingQueue } from '../core/jobs/ProcessingQueue';
 import { createAnalyseHandler } from '../core/jobs/handlers/analyseHandler';
 import { createTranscribeHandler } from '../core/jobs/handlers/transcribeHandler';
 import { modelManager } from '../core/models/ModelManager';
-import { DEFAULT_BUNDLE_ID, getBundle } from '../core/models/bundles';
+import { activeBundle } from '../core/models/activeBundle';
 import { uuidv7 } from '../domain/ids';
 import { cryptoRandomSource } from '../core/platform';
 import { InsightsService } from './InsightsService';
@@ -30,7 +31,7 @@ type Built = Omit<Services, 'revision'>;
 
 /** Resolves the active model for a pipeline step from the installed bundle. */
 function resolveModel(kind: 'stt' | 'llm'): ModelRef | null {
-  const bundle = getBundle(DEFAULT_BUNDLE_ID);
+  const bundle = activeBundle();
   const modelId = kind === 'stt' ? bundle.sttModelId : bundle.llmModelId;
   const installed = modelManager.installed(modelId);
   if (!installed) return null;
@@ -83,6 +84,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
           deviceId,
           random: cryptoRandomSource,
           onChange: bumpRevision,
+          deleteAudio: deleteRecordingFile,
         });
 
         await queue.start();
@@ -92,6 +94,8 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
         // Before the app can record: anything on disk with no entry was left by
         // a kill while paused or a crash mid-recording. Best effort.
         await journal.recoverUnsavedRecordings(findRecordings()).catch(() => 0);
+        // Entries deleted by earlier versions were only hidden; erase them now.
+        await journal.eraseDeletedLeftovers().catch(() => {});
 
         if (cancelled) {
           await queue.stop();

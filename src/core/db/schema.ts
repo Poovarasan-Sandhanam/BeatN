@@ -118,10 +118,12 @@ CREATE UNIQUE INDEX idx_jobs_one_live_per_entry_type
 /**
  * Connection-scoped pragmas. `foreign_keys` is OFF by default in SQLite and
  * resets per connection, so it must be set on every open — without it the
- * ON DELETE CASCADE rules above are silently inert.
+ * ON DELETE CASCADE rules above are silently inert. `secure_delete` overwrites
+ * erased content instead of leaving it in free pages of the file.
  */
 export const CONNECTION_PRAGMAS = `
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 PRAGMA busy_timeout = 5000;
+PRAGMA secure_delete = ON;
 `;

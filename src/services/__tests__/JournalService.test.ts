@@ -29,9 +29,11 @@ function makeService(overrides: Partial<JournalServiceDeps> = {}) {
     findById: jest.fn(async () => null),
     setFavourite: jest.fn(async () => {}),
     knownRecordingNames: jest.fn(async () => new Set<string>(['known.wav'])),
-    softDelete: jest.fn(async () => {
-      order.push('softDelete');
+    eraseEntry: jest.fn(async () => {
+      order.push('eraseEntry');
+      return 'file:///r/1.wav';
     }),
+    eraseDeletedContent: jest.fn(async () => ['file:///r/old.wav']),
   };
 
   const jobs = {
@@ -145,10 +147,10 @@ describe('retry', () => {
 });
 
 describe('delete', () => {
-  it('soft deletes, so the tombstone can sync later', async () => {
+  it('erases rather than hard-deletes, so a tombstone can sync later', async () => {
     const h = makeService();
     await h.service.delete('e1');
-    expect(h.entries.softDelete).toHaveBeenCalledWith('e1');
+    expect(h.entries.eraseEntry).toHaveBeenCalledWith('e1');
   });
 });
 
@@ -174,7 +176,7 @@ describe('onChange', () => {
   it('fires after a delete lands', async () => {
     const h = withChangeLog();
     await h.service.delete('e1');
-    expect(h.order).toEqual(['softDelete', 'onChange']);
+    expect(h.order).toEqual(['eraseEntry', 'onChange']);
   });
 
   it('fires after a favourite changes', async () => {
@@ -233,6 +235,24 @@ describe('recoverUnsavedRecordings', () => {
     const h = makeService();
     expect(await h.service.recoverUnsavedRecordings([])).toBe(0);
     expect(h.entries.knownRecordingNames).not.toHaveBeenCalled();
+  });
+});
+
+describe('erasing', () => {
+  it('deletes the recording file after erasing the entry', async () => {
+    const deleteAudio = jest.fn();
+    const h = makeService({ deleteAudio });
+    await h.service.delete('e1');
+    expect(h.entries.eraseEntry).toHaveBeenCalledWith('e1');
+    expect(deleteAudio).toHaveBeenCalledWith('file:///r/1.wav');
+  });
+
+  it('finishes erasing entries that older versions only hid', async () => {
+    const deleteAudio = jest.fn();
+    const h = makeService({ deleteAudio });
+    await h.service.eraseDeletedLeftovers();
+    expect(h.entries.eraseDeletedContent).toHaveBeenCalled();
+    expect(deleteAudio).toHaveBeenCalledWith('file:///r/old.wav');
   });
 });
 
