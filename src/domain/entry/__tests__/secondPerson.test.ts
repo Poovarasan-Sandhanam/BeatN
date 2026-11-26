@@ -30,6 +30,27 @@ describe('toSecondPerson', () => {
   });
 
   it.each([
+    [
+      'Today was a good day. The person finished a presentation and felt proud and calm.',
+      'Today was a good day. You finished a presentation and felt proud and calm.',
+    ],
+    [
+      'A heavy week. The user is tired and they want a quiet weekend.',
+      "A heavy week. You're tired and you want a quiet weekend.",
+    ],
+    ['Work ran late! This person needs rest.', 'Work ran late! You need rest.'],
+  ])('rewrites narration that starts mid-text: %p', (input, expected) => {
+    expect(toSecondPerson(input)).toBe(expected);
+  });
+
+  it.each([
+    'Your manager said the person who led it did well.', // not at a sentence start
+    'Today was calm. They said the project is late.',
+  ])('leaves %p alone — no sentence narrates the user', (text) => {
+    expect(toSecondPerson(text)).toBe(text);
+  });
+
+  it.each([
     "You're planning a trip to Europe.",
     'A long day, but a good one.',
     'They said the project is late.', // reported speech, not narration of the user

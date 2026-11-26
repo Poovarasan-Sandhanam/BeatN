@@ -4,11 +4,14 @@
  * A journal should speak to you, not about you. The analysis prompt asks for
  * the second person, but small on-device models often slip into narrating
  * "the person" or "the user". This catches the common shapes of that slip.
- * It is deliberately narrow: text that does not open by narrating someone
- * in the third person is returned untouched.
+ * It is deliberately narrow: only a sentence that opens by narrating someone
+ * in the third person — and the sentences after it — are rewritten. A model
+ * often starts in the user's own words ("Today was a good day.") and slips
+ * into narration in the next sentence; everything before that slip is kept.
  */
 
-const NARRATOR = /^\s*(?:the|this)\s+(?:person|user|speaker|author|individual|narrator|journaler|writer)\b/i;
+/** A sentence that opens by narrating the user: at the start, or after . ! ? */
+const NARRATED_SENTENCE = /(^\s*|[.!?]["”’)]?\s+)(?:the|this)\s+(?:person|user|speaker|author|individual|narrator|journaler|writer)\b/i;
 const NARRATOR_ANYWHERE = /\b(?:the|this)\s+(?:person|user|speaker|author|individual|narrator|journaler|writer)\b/gi;
 
 /** "is" → "are", "feels" → "feel", "worries" → "worry": the verb after "you". */
@@ -43,8 +46,14 @@ function capitalise(text: string): string {
 }
 
 export function toSecondPerson(text: string): string {
-  if (!NARRATOR.test(text)) return text;
+  const match = NARRATED_SENTENCE.exec(text);
+  if (!match) return text;
+  const cut = match.index + match[1].length;
+  return text.slice(0, cut) + rewriteNarration(text.slice(cut));
+}
 
+/** Rewrites text that opens with the narrator ("The person …"). */
+function rewriteNarration(text: string): string {
   // Subject + first verb: "The person is" → "You are", "The user feels" → "You feel".
   let result = text.replace(
     /(\b(?:the|this)\s+(?:person|user|speaker|author|individual|narrator|journaler|writer))\s+([A-Za-z']+)/gi,
