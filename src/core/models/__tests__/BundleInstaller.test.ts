@@ -155,6 +155,35 @@ describe('BundleInstaller', () => {
     expect(store.cancelled).toEqual([bundle.sttModelId]);
   });
 
+  it('turns a raw network failure into a code the screen can explain', async () => {
+    const store = new FakeStore();
+    jest
+      .spyOn(store, 'download')
+      .mockRejectedValue(new Error('The Internet connection appears to be offline.'));
+
+    await expect(new BundleInstaller(store).install(bundle)).rejects.toThrow('MODEL_DOWNLOAD_FAILED');
+  });
+
+  it('keeps its own download codes as they are', async () => {
+    const store = new FakeStore();
+    jest.spyOn(store, 'download').mockRejectedValue(new Error('MODEL_DOWNLOAD_INSUFFICIENT_STORAGE'));
+
+    await expect(new BundleInstaller(store).install(bundle)).rejects.toThrow(
+      'MODEL_DOWNLOAD_INSUFFICIENT_STORAGE',
+    );
+  });
+
+  it('reports a cancel as a cancel even when the native task throws', async () => {
+    const store = new FakeStore();
+    const installer = new BundleInstaller(store);
+    jest.spyOn(store, 'download').mockImplementation(async () => {
+      installer.cancel();
+      throw new Error('The operation was cancelled');
+    });
+
+    await expect(installer.install(bundle)).rejects.toThrow('BUNDLE_INSTALL_CANCELLED');
+  });
+
   it('reports a checking phase after each download, at full progress for that model', async () => {
     const store = new FakeStore();
     const events: BundleProgress[] = [];

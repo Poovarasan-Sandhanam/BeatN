@@ -111,6 +111,8 @@ export class BundleInstaller {
           },
           () => emit(spec.id, spec.approxBytes, true),
         );
+      } catch (error) {
+        throw this.explain(error);
       } finally {
         this.activeModelId = null;
       }
@@ -121,6 +123,18 @@ export class BundleInstaller {
     }
 
     emit(null, 0);
+  }
+
+  /**
+   * A cancelled download fails with whatever the native task throws, and a
+   * dropped connection fails with raw platform text the user never sees. Both
+   * become codes the screen has words for.
+   */
+  private explain(error: unknown): Error {
+    if (this.cancelled) return new Error('BUNDLE_INSTALL_CANCELLED');
+    const message = error instanceof Error ? error.message : '';
+    if (message.startsWith('MODEL_DOWNLOAD_')) return error as Error;
+    return new Error('MODEL_DOWNLOAD_FAILED');
   }
 
   /** Cancels the download in flight and stops before the next one starts. */
