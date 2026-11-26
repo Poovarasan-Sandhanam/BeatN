@@ -1,3 +1,4 @@
+import { NetworkStateType, useNetworkState } from 'expo-network';
 import { useCallback, useEffect, useState } from 'react';
 
 import { BundleInstaller, type BundleProgress } from '../../core/models/BundleInstaller';
@@ -20,6 +21,12 @@ export function useBundleInstall(bundle: ModelBundle) {
   const [phase, setPhase] = useState<InstallPhase>('idle');
   const [progress, setProgress] = useState<BundleProgress | null>(null);
   const [errorText, setErrorText] = useState('');
+
+  // Unknown (undefined) is not offline: the first native reading arrives a
+  // moment after mount, and a "you're offline" flash would be a lie.
+  const network = useNetworkState();
+  const offline = network.isConnected === false;
+  const onMobileData = network.type === NetworkStateType.CELLULAR;
 
   // `remainingBytes` stats the filesystem once per model. Reading it during
   // render meant two sync stat() calls on every progress tick — dozens a
@@ -69,5 +76,5 @@ export function useBundleInstall(bundle: ModelBundle) {
     installer.cancel();
   }, [installer]);
 
-  return { phase, progress, errorText, remainingBytes, start, cancel };
+  return { phase, progress, errorText, remainingBytes, offline, onMobileData, start, cancel };
 }

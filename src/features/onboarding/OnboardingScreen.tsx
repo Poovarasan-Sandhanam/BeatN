@@ -28,7 +28,8 @@ const PROMISES = [
  */
 export default function OnboardingScreen({ bundle, onReady }: OnboardingScreenProps) {
   const theme = useTheme();
-  const { phase, progress, errorText, remainingBytes, start, cancel } = useBundleInstall(bundle);
+  const { phase, progress, errorText, remainingBytes, offline, onMobileData, start, cancel } =
+    useBundleInstall(bundle);
 
   useEffect(() => {
     if (phase === 'done') onReady();
@@ -94,13 +95,24 @@ export default function OnboardingScreen({ bundle, onReady }: OnboardingScreenPr
             <ProgressBar progress={progress?.overall ?? 0} label="Model download progress" height={6} />
             {progress !== null && (
               <Text variant="caption" tone="faint">
-                {formatBytes(progress.bytesWritten)} of {formatBytes(progress.totalBytes)} · keep BeatN open
+                {formatBytes(progress.bytesWritten)} of {formatBytes(progress.totalBytes)} ·{' '}
+                {offline ? 'connection lost' : 'keep BeatN open'}
               </Text>
             )}
           </Card>
         )}
 
-        {phase === 'error' && errorText !== '' && (
+        {offline && !installing && (
+          <Card variant="flat" accessibilityRole="alert" style={{ gap: theme.spacing.xs }}>
+            <Text variant="bodyStrong">You’re offline</Text>
+            <Text variant="caption" tone="muted">
+              Connect to Wi-Fi or mobile data to download. After this one download, BeatN never
+              needs the internet again.
+            </Text>
+          </Card>
+        )}
+
+        {phase === 'error' && errorText !== '' && !offline && (
           <Card variant="flat" style={{ backgroundColor: theme.colors.dangerSoft, borderColor: 'transparent' }}>
             <Text variant="body" tone="danger">
               {errorText}
@@ -113,13 +125,24 @@ export default function OnboardingScreen({ bundle, onReady }: OnboardingScreenPr
         ) : (
           <>
             <Button
-              label={phase === 'error' ? 'Try again' : `Download · ${formatBytes(remainingBytes)}`}
+              label={
+                offline
+                  ? 'Waiting for a connection'
+                  : phase === 'error'
+                    ? 'Try again'
+                    : `Download · ${formatBytes(remainingBytes)}`
+              }
               size="large"
+              disabled={offline}
               onPress={start}
             />
-            <Text variant="caption" tone="faint" align="center">
-              Best over Wi-Fi. You only do this once.
-            </Text>
+            {!offline && (
+              <Text variant="caption" tone="faint" align="center">
+                {onMobileData
+                  ? `You’re on mobile data — this uses ${formatBytes(remainingBytes)}. Wi-Fi is best.`
+                  : 'Best over Wi-Fi. You only do this once.'}
+              </Text>
+            )}
           </>
         )}
       </FadeIn>
