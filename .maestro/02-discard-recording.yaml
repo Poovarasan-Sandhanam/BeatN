@@ -1,0 +1,23 @@
+# A recording longer than five seconds asks before it is thrown away, and
+# "Keep recording" really keeps it.
+appId: com.beatn.app
+name: Discard asks first
+tags: [record]
+---
+- runFlow: subflows/open-journal.yaml
+- tapOn: "New entry|Record your first entry"
+- tapOn: "Start recording"
+- extendedWaitUntil:
+    visible: "Pause recording"
+    timeout: 10000
+# Past 5 seconds, closing asks first. The timer is the clock to wait on.
+- extendedWaitUntil:
+    visible: "Recording, 0:(0[6-9]|[1-5][0-9])"
+    timeout: 15000
+- tapOn: "Discard recording"
+- assertVisible: "Discard this recording?"
+- tapOn: "Keep recording"
+- assertVisible: "Pause recording"
+- tapOn: "Discard recording"
+- tapOn: "Discard"
+- assertVisible: "New entry|Record your first entry"

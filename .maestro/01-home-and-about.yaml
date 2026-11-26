@@ -1,0 +1,14 @@
+# Home renders, and About shows the privacy policy and support links that
+# App Review requires inside the app.
+appId: com.beatn.app
+name: Home and About
+tags: [smoke]
+---
+- runFlow: subflows/open-journal.yaml
+- tapOn: "About BeatN, privacy and support"
+- assertVisible: "About"
+- assertVisible: "Privacy policy"
+- assertVisible: "Support and questions"
+- assertVisible: "Email support"
+- tapOn: "Back"
+- assertVisible: "New entry|Record your first entry"

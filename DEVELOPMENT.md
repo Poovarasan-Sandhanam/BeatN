@@ -234,3 +234,34 @@ enforces the dependency rule from
 [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md) — it fails the build if domain
 code imports a platform library, if a screen imports an AI runtime or SQLite,
 or if anything under `src/core/` or `src/domain/` logs to the console.
+
+### End-to-end tests (Maestro, iOS simulator)
+
+The flows in [.maestro/](.maestro/) drive the real app on a simulator:
+
+| Flow | Checks |
+| --- | --- |
+| `01-home-and-about` (`smoke`) | Home opens; About shows the privacy and support links |
+| `02-discard-recording` (`record`) | Closing a recording over 5 s asks first; "Keep recording" keeps it |
+| `03-record-play-delete` (`record`, `slow`) | Record with pause/resume, save, on-device transcription and reflection to **Ready**, playback, delete |
+
+One-off setup:
+
+```sh
+brew tap mobile-dev-inc/tap && brew install mobile-dev-inc/tap/maestro   # needs Java 17+
+npx expo run:ios --configuration Release   # then finish onboarding once, so the models are on the simulator
+```
+
+Run:
+
+```sh
+npm run e2e:ios                              # all flows (~3–6 min)
+npm run e2e:ios -- --include-tags=smoke      # quick check
+```
+
+The flows never clear app data — that would delete the downloaded models.
+BeatN's lock is real in tests: [scripts/e2e-ios.sh](scripts/e2e-ios.sh)
+enrolls simulated Face ID and answers each prompt with a match, so the app
+needs no test backdoor. The simulator records from the Mac's microphone, so
+entries are mostly silence; the flow checks the pipeline finishes, not what
+was transcribed.
