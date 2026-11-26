@@ -57,10 +57,24 @@ export interface ListOptions {
 }
 
 export class JournalEntryRepository {
+  /**
+   * @param resolveAudioUri Maps a stored recording URI to where the file is
+   *   now. iOS can move the app's container when the app is updated, so an
+   *   absolute path saved by an earlier install may point at a folder that no
+   *   longer exists; the file itself is still in the recordings folder under
+   *   the same name. Applied to every URI this repository hands out.
+   */
   constructor(
     private readonly db: Database,
     private readonly now: () => number = Date.now,
+    private readonly resolveAudioUri: (storedUri: string) => string = (uri) => uri,
   ) {}
+
+  private toEntry(...args: Parameters<typeof rowToEntry>): JournalEntry {
+    const entry = rowToEntry(...args);
+    if (!entry.audio.uri) return entry;
+    return { ...entry, audio: { ...entry.audio, uri: this.resolveAudioUri(entry.audio.uri) } };
+  }
 
   async create(entry: JournalEntry): Promise<void> {
     const row = entryToRow(entry);
@@ -81,7 +95,7 @@ export class JournalEntryRepository {
     if (!row) return null;
 
     const [topics, entities] = await Promise.all([this.topicsFor(id), this.entitiesFor(id)]);
-    return rowToEntry(row, topics, entities);
+    return this.toEntry(row, topics, entities);
   }
 
   /** Newest first. Topics and entities are not loaded — the list does not need them. */
@@ -93,7 +107,7 @@ export class JournalEntryRepository {
        LIMIT ? OFFSET ?`,
       [limit, offset],
     );
-    return rows.map((row) => rowToEntry(row));
+    return rows.map((row) => this.toEntry(row));
   }
 
   /** Entries whose processing never finished — the restart-recovery query. */
@@ -103,7 +117,7 @@ export class JournalEntryRepository {
        WHERE deleted_at IS NULL AND processing_state NOT IN ('ready', 'failed')
        ORDER BY created_at ASC`,
     );
-    return rows.map((row) => rowToEntry(row));
+    return rows.map((row) => this.toEntry(row));
   }
 
   /**
@@ -250,7 +264,7 @@ export class JournalEntryRepository {
       await this.db.runAsync('DELETE FROM entry_entities WHERE entry_id = ?', [id]);
       await this.db.runAsync('DELETE FROM processing_jobs WHERE entry_id = ?', [id]);
     });
-    return row.audio_uri;
+    return row.audio_uri ? this.resolveAudioUri(row.audio_uri) : null;
   }
 
   /**
@@ -276,7 +290,7 @@ export class JournalEntryRepository {
         );
       }
     });
-    return rows.map((row) => row.audio_uri);
+    return rows.map((row) => this.resolveAudioUri(row.audio_uri));
   }
 
   /**
@@ -318,7 +332,7 @@ export class JournalEntryRepository {
     for (const row of topicRows) {
       topicsByEntry.set(row.entry_id, [...(topicsByEntry.get(row.entry_id) ?? []), rowToTopic(row)]);
     }
-    return rows.map((row) => rowToEntry(row, topicsByEntry.get(row.id) ?? []));
+    return rows.map((row) => this.toEntry(row, topicsByEntry.get(row.id) ?? []));
   }
 
   /** Voice measurements from before a time, newest first — the baseline for judging a period. */

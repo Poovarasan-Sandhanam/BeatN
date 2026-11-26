@@ -5,6 +5,7 @@ import { getOrCreateDeviceId, openDatabase } from '../core/db/connection';
 import { JournalEntryRepository } from '../core/db/repositories/JournalEntryRepository';
 import { ProcessingJobRepository } from '../core/db/repositories/ProcessingJobRepository';
 import { deleteRecordingFile } from '../core/audio/recordingFiles';
+import { currentRecordingUri } from '../core/audio/recordingsFolder';
 import { findRecordings } from '../core/audio/recordingRecovery';
 import { analyseVoice } from '../core/audio/voiceAnalysis';
 import { ProcessingQueue } from '../core/jobs/ProcessingQueue';
@@ -61,7 +62,7 @@ export function ServiceProvider({ children }: { children: ReactNode }) {
         const db = await openDatabase();
         const deviceId = await getOrCreateDeviceId(db, cryptoRandomSource);
 
-        const entries = new JournalEntryRepository(db);
+        const entries = new JournalEntryRepository(db, Date.now, currentRecordingUri);
         const jobs = new ProcessingJobRepository(db, () => uuidv7(cryptoRandomSource));
 
         const bumpRevision = () => setRevision((value) => value + 1);
