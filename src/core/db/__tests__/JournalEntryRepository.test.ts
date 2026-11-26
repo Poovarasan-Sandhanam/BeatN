@@ -1,5 +1,6 @@
 import type { JournalEntry } from '../../../domain/entry/JournalEntry';
 import { JournalEntryRepository, fileName } from '../repositories/JournalEntryRepository';
+import { entryToRow } from '../mappers';
 import type { Database, SqlRunResult, SqlValue } from '../types';
 
 interface Executed {
@@ -310,5 +311,39 @@ describe('knownRecordingNames', () => {
 describe('fileName', () => {
   it('takes the last path segment of a file URI', () => {
     expect(fileName('file:///var/mobile/Containers/Data/x/Documents/recordings/17.wav')).toBe('17.wav');
+  });
+});
+
+describe('recording URIs follow the app container', () => {
+  // iOS can move the container on update; the repository re-anchors every
+  // stored URI through the resolver it is given.
+  const moved = (uri: string) => uri.replace('/OLD/', '/NEW/');
+  const stored = 'file:///Containers/OLD/Documents/recordings/17.wav';
+
+  it('resolves the URI on entries it reads', async () => {
+    const db = new RecordingDatabase();
+    db.firstRow = entryToRow({ ...entry, audio: { ...entry.audio, uri: stored } });
+    const found = await new JournalEntryRepository(db, Date.now, moved).findById('entry-1');
+    expect(found?.audio.uri).toBe('file:///Containers/NEW/Documents/recordings/17.wav');
+  });
+
+  it('resolves the URI erasing returns, so the real file is deleted', async () => {
+    const db = new RecordingDatabase();
+    db.firstRow = { audio_uri: stored };
+    const uri = await new JournalEntryRepository(db, Date.now, moved).eraseEntry('entry-1');
+    expect(uri).toBe('file:///Containers/NEW/Documents/recordings/17.wav');
+  });
+
+  it('resolves the URIs left by earlier deletes', async () => {
+    const db = new RecordingDatabase();
+    db.allRows = [{ audio_uri: stored }];
+    const uris = await new JournalEntryRepository(db, Date.now, moved).eraseDeletedContent();
+    expect(uris).toEqual(['file:///Containers/NEW/Documents/recordings/17.wav']);
+  });
+
+  it('keeps a missing URI missing', async () => {
+    const db = new RecordingDatabase();
+    db.firstRow = { audio_uri: null };
+    expect(await new JournalEntryRepository(db, Date.now, moved).eraseEntry('entry-1')).toBeNull();
   });
 });
