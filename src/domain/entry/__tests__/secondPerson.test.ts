@@ -56,6 +56,24 @@ describe('toSecondPerson', () => {
   });
 
   it.each([
+    [
+      "You're not a singer and feels uncertain about your abilities.",
+      "You're not a singer and feel uncertain about your abilities.",
+    ],
+    ['A long day. You worked late and seems tired.', 'A long day. You worked late and seem tired.'],
+  ])('fixes a third-person verb in a sentence already about you: %p', (input, expected) => {
+    expect(toSecondPerson(input)).toBe(expected);
+  });
+
+  it.each([
+    'They said the project is late and seems stuck.',
+    'Your sister called and seems happier.',
+    'You love needs and wants lists.',
+  ])('leaves %p alone — the carried verb is not yours', (text) => {
+    expect(toSecondPerson(text)).toBe(text);
+  });
+
+  it.each([
     ['The person thinks about needs and wants.', 'You think about needs and wants.'],
     ['The user wrote about hopes and fears.', 'You wrote about hopes and fears.'],
     ['The person talked about work and plans.', 'You talked about work and plans.'],

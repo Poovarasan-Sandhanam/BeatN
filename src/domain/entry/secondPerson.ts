@@ -61,9 +61,29 @@ function capitalise(text: string): string {
 
 export function toSecondPerson(text: string): string {
   const match = NARRATED_SENTENCE.exec(text);
-  if (!match) return text;
+  if (!match) return fixYouSentences(text);
   const cut = match.index + match[1].length;
-  return text.slice(0, cut) + rewriteNarration(text.slice(cut));
+  return fixYouSentences(text.slice(0, cut)) + rewriteNarration(text.slice(cut));
+}
+
+/**
+ * A sentence already about "you" can still carry a third-person verb — the
+ * model writes it, or it was saved by an older version of this rewrite:
+ * "You're not a singer and feels unsure" → "…and feel unsure". Only sentences
+ * that open with "you" are touched, so "They said it is late and seems…" stays.
+ */
+function fixYouSentences(text: string): string {
+  return text.replace(/(^|[.!?]["”’)]?\s+)(you\b[^.!?]*)/gi, (_m, lead: string, sentence: string) =>
+    lead + agreeCarriedVerbs(sentence),
+  );
+}
+
+function agreeCarriedVerbs(text: string): string {
+  return text.replace(
+    CONTINUED_VERB,
+    (_m, conjunction: string, adverb: string | undefined, verb: string) =>
+      `${conjunction}${adverb ?? ''} ${toPlural(verb)}`,
+  );
 }
 
 /** Rewrites text that opens with the narrator ("The person …"). */
@@ -74,11 +94,7 @@ function rewriteNarration(text: string): string {
     (_match, _subject: string, verb: string) => `you ${toPlural(verb)}`,
   );
   result = result.replace(NARRATOR_ANYWHERE, 'you');
-  result = result.replace(
-    CONTINUED_VERB,
-    (_m, conjunction: string, adverb: string | undefined, verb: string) =>
-      `${conjunction}${adverb ?? ''} ${toPlural(verb)}`,
-  );
+  result = agreeCarriedVerbs(result);
   for (const [pattern, replacement] of PRONOUNS) result = result.replace(pattern, replacement);
 
   // Contract the common opener, as a person would say it.
