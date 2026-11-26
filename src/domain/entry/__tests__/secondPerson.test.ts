@@ -44,6 +44,26 @@ describe('toSecondPerson', () => {
   });
 
   it.each([
+    [
+      'The person is not a singer and feels uncertain about their abilities.',
+      "You're not a singer and feel uncertain about your abilities.",
+    ],
+    ['The user is tired but still wants to finish the project.', "You're tired but still want to finish the project."],
+    ['The person had a long day and worries about tomorrow.', 'You had a long day and worry about tomorrow.'],
+    ['The speaker feels calm and seems ready for the week.', 'You feel calm and seem ready for the week.'],
+  ])('keeps a carried-over verb in agreement: %p', (input, expected) => {
+    expect(toSecondPerson(input)).toBe(expected);
+  });
+
+  it.each([
+    ['The person thinks about needs and wants.', 'You think about needs and wants.'],
+    ['The user wrote about hopes and fears.', 'You wrote about hopes and fears.'],
+    ['The person talked about work and plans.', 'You talked about work and plans.'],
+  ])('leaves a noun after "and" alone: %p', (input, expected) => {
+    expect(toSecondPerson(input)).toBe(expected);
+  });
+
+  it.each([
     'Your manager said the person who led it did well.', // not at a sentence start
     'Today was calm. They said the project is late.',
   ])('leaves %p alone — no sentence narrates the user', (text) => {
