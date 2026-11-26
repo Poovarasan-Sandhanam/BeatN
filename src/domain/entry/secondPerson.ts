@@ -38,8 +38,22 @@ const PRONOUNS: [RegExp, string][] = [
   [/\bthem\b/gi, 'you'],
 ];
 
-/** A verb carried over from the subject: "…and is very happy" → "…and are very happy". */
-const CONTINUED_VERB = /\b(and|but|yet|or)\s+(is|was|has|isn't|wasn't|hasn't)\b/gi;
+/**
+ * A verb carried over from the subject: "…and is very happy" → "…and are very
+ * happy", "…and feels unsure" → "…and feel unsure".
+ *
+ * Only words that are verbs whatever follows them are changed on sight. Words
+ * that are just as often nouns ("needs and wants", "hopes and fears") change
+ * only when what follows makes them a verb: "…and wants to rest".
+ */
+const ADVERB = '(?:also|still|really|often|sometimes|now|even|just|clearly|deeply|increasingly)';
+const ALWAYS_VERB =
+  "is|was|has|does|isn't|wasn't|hasn't|doesn't|feels|seems|appears|enjoys|tries|finds|knows|believes|thinks|wonders|realises|realizes|acknowledges|recognises|recognizes|appreciates|decides|expresses|mentions|describes|says|notes|considers|misses|keeps|continues|remains|gets|becomes|goes|reflects|admits";
+const VERB_BEFORE = 'wants|needs|hopes|wishes|worries|plans|fears|doubts|cares|struggles';
+const CONTINUED_VERB = new RegExp(
+  `\\b(and|but|yet|or)(\\s+${ADVERB})?\\s+(${ALWAYS_VERB}|(?:${VERB_BEFORE})(?=\\s+(?:to|that|about|for|with|more|less)\\b))\\b`,
+  'gi',
+);
 
 function capitalise(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
@@ -47,9 +61,29 @@ function capitalise(text: string): string {
 
 export function toSecondPerson(text: string): string {
   const match = NARRATED_SENTENCE.exec(text);
-  if (!match) return text;
+  if (!match) return fixYouSentences(text);
   const cut = match.index + match[1].length;
-  return text.slice(0, cut) + rewriteNarration(text.slice(cut));
+  return fixYouSentences(text.slice(0, cut)) + rewriteNarration(text.slice(cut));
+}
+
+/**
+ * A sentence already about "you" can still carry a third-person verb — the
+ * model writes it, or it was saved by an older version of this rewrite:
+ * "You're not a singer and feels unsure" → "…and feel unsure". Only sentences
+ * that open with "you" are touched, so "They said it is late and seems…" stays.
+ */
+function fixYouSentences(text: string): string {
+  return text.replace(/(^|[.!?]["”’)]?\s+)(you\b[^.!?]*)/gi, (_m, lead: string, sentence: string) =>
+    lead + agreeCarriedVerbs(sentence),
+  );
+}
+
+function agreeCarriedVerbs(text: string): string {
+  return text.replace(
+    CONTINUED_VERB,
+    (_m, conjunction: string, adverb: string | undefined, verb: string) =>
+      `${conjunction}${adverb ?? ''} ${toPlural(verb)}`,
+  );
 }
 
 /** Rewrites text that opens with the narrator ("The person …"). */
@@ -60,7 +94,7 @@ function rewriteNarration(text: string): string {
     (_match, _subject: string, verb: string) => `you ${toPlural(verb)}`,
   );
   result = result.replace(NARRATOR_ANYWHERE, 'you');
-  result = result.replace(CONTINUED_VERB, (_m, conjunction: string, verb: string) => `${conjunction} ${toPlural(verb)}`);
+  result = agreeCarriedVerbs(result);
   for (const [pattern, replacement] of PRONOUNS) result = result.replace(pattern, replacement);
 
   // Contract the common opener, as a person would say it.
