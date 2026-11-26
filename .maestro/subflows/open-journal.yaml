@@ -1,0 +1,11 @@
+# Opens BeatN on its home screen. Never clears app data: that would delete the
+# downloaded models (about 1.2 GB) and send the app back to onboarding.
+appId: com.beatn.app
+---
+- launchApp:
+    stopApp: true
+    permissions:
+      microphone: allow
+- extendedWaitUntil:
+    visible: "New entry|Record your first entry"
+    timeout: 30000

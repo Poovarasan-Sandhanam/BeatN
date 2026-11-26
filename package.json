@@ -58,7 +58,8 @@
     "lint:fix": "npm run clean:appledouble && eslint . --fix",
     "beta:ios": "npm run clean:appledouble && npx eas-cli@latest build --platform ios --profile beta --auto-submit-with-profile beta",
     "beta:android": "npm run clean:appledouble && npx eas-cli@latest build --platform android --profile beta --auto-submit-with-profile beta",
-    "beta:android:closed": "npm run clean:appledouble && npx eas-cli@latest build --platform android --profile beta --auto-submit-with-profile closed"
+    "beta:android:closed": "npm run clean:appledouble && npx eas-cli@latest build --platform android --profile beta --auto-submit-with-profile closed",
+    "e2e:ios": "bash ./scripts/e2e-ios.sh"
   },
   "private": true,
   "jest": {

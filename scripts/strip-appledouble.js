@@ -27,7 +27,7 @@ if (process.platform !== 'darwin') process.exit(0);
 const projectRoot = path.join(__dirname, '..');
 const targets = process.argv.slice(2).length
   ? process.argv.slice(2).map((target) => path.resolve(projectRoot, target))
-  : ['.git', 'node_modules', 'ios', 'android', 'patches'].map((dir) => path.join(projectRoot, dir));
+  : ['.git', '.maestro', 'node_modules', 'ios', 'android', 'patches'].map((dir) => path.join(projectRoot, dir));
 
 let removed = 0;
 

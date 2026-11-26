@@ -1,0 +1,43 @@
+# The core journey: record with a pause in the middle, save, wait for the
+# on-device pipeline to finish, play it back, then delete it.
+appId: com.beatn.app
+name: Record, process, play, delete
+tags: [record, slow]
+---
+- runFlow: subflows/open-journal.yaml
+- tapOn: "New entry|Record your first entry"
+- tapOn: "Start recording"
+- extendedWaitUntil:
+    visible: "Pause recording"
+    timeout: 10000
+- extendedWaitUntil:
+    visible: "Recording, 0:(0[3-9]|[1-5][0-9])"
+    timeout: 15000
+- tapOn: "Pause recording"
+- assertVisible: "Resume recording"
+- tapOn: "Resume recording"
+- extendedWaitUntil:
+    visible: "Recording, 0:(0[6-9]|[1-5][0-9])"
+    timeout: 15000
+- tapOn: "Stop and save"
+
+# Saved immediately, then processed in the background.
+- extendedWaitUntil:
+    visible: ".* at .*"
+    timeout: 15000
+- extendedWaitUntil:
+    visible: ".* at .*Ready"
+    timeout: 300000   # whisper + llama on a simulator can be slow
+
+- tapOn: ".* at .*Ready"
+- assertVisible: "Play recording"
+- tapOn: "Play recording"
+- assertVisible: "Pause"
+- tapOn: "Pause"
+
+- tapOn: "Delete"
+- assertVisible: "Delete this entry?"
+- tapOn:
+    text: "Delete"
+    index: 1   # the alert's button, not the header link behind it
+- assertNotVisible: ".* at .*Ready"
